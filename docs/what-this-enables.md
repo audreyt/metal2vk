@@ -1,28 +1,16 @@
 # What metal2vk enables
 
-Many fast AI programs for Apple Silicon are written in Metal, Apple's GPU language, and only run on macOS. metal2vk reads
-those Metal kernels and turns them into Vulkan programs with open source tools (clang, clspv and SPIRV-Tools), so they can run
-on Apple Silicon under Linux through an open source Vulkan driver, with no Apple software involved. The models that depend on
-these kernels are the ones whose speed comes from custom code: Qwen3.5-class mixture-of-experts models and gated-delta-net
-models served through oMLX, mlx-lm and mlx-vlm, the Mirai uzu engine, and the TensorFold Zig engine.
+Many fast AI programs for Apple Silicon are written in Metal, Apple's GPU language. They only run on macOS. This project reads those Metal kernels and turns them into Vulkan programs with open source tools. The tools are clang, clspv and SPIRV-Tools. The programs can then run on Apple Silicon under Linux through an open source Vulkan driver. No Apple software is involved.
 
-What has been measured so far: out of 610 Metal kernels taken from the real uzu and TensorFold sources, 606 compile to valid
-Vulkan programs, including all 121 uzu kernels. Of 32 sampled oMLX, mlx-lm and mlx-vlm kernels, 31 compile. These 31 were run
-on an M1 and checked against a reference (the original translator's output where it had one, otherwise a step-by-step Python
-model of the Metal source), and all 31 agree. Two differences stay inside what the Metal source leaves open. Five values out
-of about 9,200 in one mixture-of-experts kernel differ by 2 to 3 units in the last place of a 16-bit float, which is the
-order in which the GPU adds partial sums. In one attention kernel, about 0.4 percent of the values differ by at most 0.02
-percent of the largest value in their row, because Metal does not fix the exact rounding of its exponential function. The
-check still fails when a block of keys is skipped or the mask is shifted by one row. The remaining sampled kernel uses a
-Metal feature that only exists on the newest chip (M5) and is refused by name. A kernel that fails to translate or fails its
-check is never run: it falls back to the older route or stops with an error that names the kernel.
+The models that depend on these kernels are the ones whose speed comes from custom code. They are Qwen3.5-class mixture-of-experts models and gated-delta-net models served through oMLX, mlx-lm and mlx-vlm, the Mirai uzu engine, and the TensorFold Zig engine.
 
-What has not been measured yet: how fast whole models run through this route. The cutover of oMLX's custom kernels to metal2vk
-is being built now, so there is no tokens-per-second number for it. What is measured is kernel speed in isolation: a simple
-register-tiled matrix multiply written in Metal runs at 4.27 TFLOP/s on an M1 Max through metal2vk, against 4.07 for the
-hand-tuned Vulkan version; uzu's own tiled matrix multiply runs at about 0.3 times the hand-tuned one, so matrix multiplies
-keep using the hand-tuned kernels and metal2vk covers the long tail of smaller kernels. Compiling a kernel takes about 1.8
-seconds the first time and 0.8 seconds when cached.
+What has been measured so far: out of 610 Metal kernels taken from the real uzu and TensorFold sources, 606 compile to valid Vulkan programs. That includes all 121 uzu kernels. Of 32 sampled oMLX, mlx-lm and mlx-vlm kernels, 31 compile. These 31 were run on an M1. They were checked against a reference. The reference is the original translator's output where it had one, otherwise a step-by-step Python model of the Metal source. All 31 agree.
+
+Two differences stay inside what the Metal source leaves open. Five values out of about 9,200 in one mixture-of-experts kernel differ by 2 to 3 units in the last place of a 16-bit float. That is the order in which the GPU adds partial sums. In one attention kernel, about 0.4 percent of the values differ by at most 0.02 percent of the largest value in their row. Metal does not fix the exact rounding of its exponential function. The check still fails when a block of keys is skipped or the mask is shifted by one row.
+
+The remaining sampled kernel uses a Metal feature that only exists on the newest chip (M5). It is refused by name. A kernel that fails to translate or fails its check is never run. It falls back to the older route or stops with an error that names the kernel.
+
+What has not been measured yet: how fast whole models run through this route. The cutover of oMLX's custom kernels to metal2vk is being built now. There is no tokens-per-second number for it. What is measured is kernel speed in isolation. A simple register-tiled matrix multiply written in Metal runs at 4.27 TFLOP/s on an M1 Max through metal2vk, against 4.07 for the hand-tuned Vulkan version. uzu's own tiled matrix multiply runs at about 0.3 times the hand-tuned one. So matrix multiplies keep using the hand-tuned kernels. The translator covers the long tail of smaller kernels. Compiling a kernel takes about 1.8 seconds the first time and 0.8 seconds when cached.
 
 | Measured | Result |
 |---|---|
