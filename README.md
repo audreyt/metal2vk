@@ -49,7 +49,7 @@ git clone https://github.com/joshuaswarren/metal2vk
 git clone https://github.com/google/clspv && cd clspv
 git checkout f2b01dd6dce7058585eb4bcdb5326997cfeebfd4
 python3 utils/fetch_sources.py --shallow
-../metal2vk/clspv-patches/apply-all.sh .
+../metal2vk/tools/apply-clspv-patches.sh .
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCLSPV_BUILD_TESTS=OFF -B build && ninja -C build clspv
 cd ..
 ```

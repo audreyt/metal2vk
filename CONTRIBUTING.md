@@ -32,7 +32,7 @@ add or update the row for what you fixed, with the measured count.
   C++: conversions, rounding and overload rules should do what Metal does.
 - **clspv changes** are scripts in `clspv-patches/`: idempotent, guarded by anchors that fail loudly when the text moves, and tested
   against clspv `f2b01dd6dce7058585eb4bcdb5326997cfeebfd4`. Add the script to the list in `.github/workflows/sweep.yml`; the order
-  matters, and `clspv-patches/apply-all.sh` reads it from there. A pass that gives up must print `M2V-GIVEUP` so the sweep refuses
+  matters, and `tools/apply-clspv-patches.sh` reads it from there. A pass that gives up must print `M2V-GIVEUP` so the sweep refuses
   the module instead of keeping wrong code.
 - **A valid module is not a correct module.** If you can run it, say what you checked it against. The numbers in the README come from
   [docs/what-this-enables.md](docs/what-this-enables.md) and every claim there names its reference.
