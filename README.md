@@ -108,7 +108,7 @@ There is no whole-model speed number yet. Kernel speed is measured. Tokens per s
 
 The translator works and has a growing, gated test. CI runs the whole uzu and TensorFold sweep on every pull request. It fails if a kernel that used to translate stops translating.
 
-Next is whole engines on Linux, starting with oMLX. That route is the open omarchy-mlx pull request 70 (not merged). It is opt-in through an environment variable. The default stays the old translator. Checking that the GPU results match is its next gate. There is no tokens-per-second number for it yet.
+Next is whole engines on Linux, starting with oMLX. That route is merged in omarchy-mlx (pull request 70). It is opt-in through an environment variable. The default stays the old translator. There is no tokens-per-second number for it yet.
 
 The `host/` directory holds the host layer (buffers, queues, pipelines). It gives Metal-style host code a Vulkan backend.
 
