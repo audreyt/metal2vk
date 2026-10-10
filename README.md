@@ -1,15 +1,17 @@
 # metal2vk
 
+Run Metal GPU kernels on Linux: metal2vk translates Apple's Metal compute code to Vulkan with open source tools.
+
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink)](https://github.com/sponsors/joshuaswarren)
 
-Fast local AI on a Mac is trapped on macOS. Much of it gets its speed from GPU code written in Metal, Apple's GPU
-language, and Metal only exists on Apple's operating system.
+The fast local AI software for Apple Silicon (oMLX, mlx-lm, mlx-vlm, the uzu and TensorFold engines) gets its speed from GPU kernels
+written in Metal, Apple's GPU language, and Metal only exists on macOS. metal2vk reads those kernels as they are and translates them
+to Vulkan with clang, clspv and SPIRV-Tools, with no Apple software, so they can run on Apple Silicon under Linux through an open
+source Vulkan driver.
 
-metal2vk translates that Metal code into Vulkan, the open GPU standard that Linux uses. It reads the Metal files as they
-are, with open source tools only (clang, clspv and SPIRV-Tools) and no Apple software. The result runs on Apple Silicon
-under Linux through an open source Vulkan driver.
+## What works today
 
-## What is measured
+Measured, with the account of how in [docs/what-this-enables.md](docs/what-this-enables.md):
 
 | Measured | Result |
 |---|---|
@@ -23,197 +25,112 @@ under Linux through an open source Vulkan driver.
 | Compile time per kernel | 1.8 s first time, 0.8 s cached |
 | Whole-model speed through this route | not measured yet |
 
-A kernel that fails to translate or fails its check is never run: it falls back to the older route or stops with an
-error that names the kernel. The reference is the original translator's output where it had one, otherwise a
-step-by-step Python model of the Metal source. [docs/what-this-enables.md](docs/what-this-enables.md) has the full
-account.
+A kernel that fails to translate or fails its check is never run: it falls back to the older route or stops with an error that names
+the kernel. The reference for a check is the original translator's output where it had one, otherwise a step-by-step Python model of
+the Metal source.
 
-What comes next: whole engines on Linux. The oMLX route is first, in
-[omarchy-mlx](https://github.com/joshuaswarren/omarchy-mlx). There is no tokens-per-second number for it yet.
+## Why it matters
 
-## Use it
+- **Linux gets the Mac's kernels.** The speed of these engines is in their custom kernels. Translating the Metal source avoids
+  rewriting each kernel in another language.
+- **The long tail works.** The models that depend on custom kernels (Qwen3.5-class mixture-of-experts and gated-delta-net models
+  served through oMLX, mlx-lm and mlx-vlm, and the uzu and TensorFold engines) are the ones a plain port misses.
+- **It is open end to end.** clang, clspv, SPIRV-Tools and Mesa's Vulkan driver for Apple silicon. Nothing from Apple is needed.
 
-`tools/m2v-compile` takes one Metal kernel file and writes a Vulkan SPIR-V module and a description of its arguments
-(`docs/m2v-compile.md` has the arguments and exit codes). The toolchain needs clang with C++ for OpenCL, the patched
-clspv and SPIRV-Tools; the Build section below has the steps.
+## Quick start
 
-## How it works
+You need Linux, `git`, `python3` with `numpy`, `cmake` and `ninja`, clang and LLVM 23 (with C++ for OpenCL), SPIRV-Tools, and the
+Vulkan loader and headers. Running (the last step) needs a Vulkan 1.3 GPU; compiling does not.
 
-Projects that drive Apple GPUs through Metal ship their kernels as `.metal` files. metal2vk parses them as C++ for
-OpenCL against a small `metal_stdlib` shim, and lowers the result to Vulkan 1.3 compute SPIR-V with clspv. The target is
-Honeykrisp (Mesa's Vulkan driver for Apple silicon) on Linux, but the output is plain Vulkan: it needs a 32-wide
-subgroup, storage buffers and push constants, and optionally `VK_KHR_cooperative_matrix`.
+**1. Build the patched clspv.** metal2vk uses clspv at a pinned commit plus the patches in `clspv-patches/`:
 
-## Pipeline
-
-```
-kernel.metal  +  cases/<name>.cl (entry wrapper)
-        |
-        |  clang --target=spir -x cl -cl-std=clc++2021
-        |        -cl-ext=-__opencl_c_generic_address_space -O0 -Xclang -disable-O0-optnone -I include/
-        v
-   LLVM IR   (typed: noinline dropped, `opt` inliner + SROA, no InstCombine; sed strips !alias.scope / !noalias, which clspv's LLVM rejects)
-        |
-        |  clspv -x ir --cl-std=CLC++2021 --fp16 --inline-entry-points --spv-version=1.5 --long-vector   (patched, see below)
-        v
-   SPIR-V    ->  spirv-val --target-env vulkan1.3  ->  vkCreateComputePipelines
-```
-
-`compile.sh OUTDIR [case ...]` runs the whole chain. `syntax-check.sh` runs only the clang front end, which is the fast loop
-when extending the shim.
-
-Why these choices:
-
-- The IR is kept typed on purpose (`M2V_PIPELINE=typed`, the default; `o2` is the old clang -O2 route). clang 23's InstCombine rewrites
-  `getelementptr float` into byte-offset `getelementptr i8` forms, and clspv's pointer passes then lose the element type: a `float2`
-  fragment load becomes eight byte loads per lane (the 8x8 tile matmul ran 4x slower), and uzu's Gemm ended in an `OpPhi` of a float
-  pointer and a `[4 x i8]` pointer that fails validation. At -O0 clang marks every function `noinline` and leaves closure allocas with a
-  generic address space `this`; dropping `noinline` and running LLVM's inliner plus SROA (without InstCombine) removes both, and clspv
-  optimises the result itself. The route needs `opt` from the same LLVM as clang (`OPT=` selects it).
-
-- clang is the front end, not clspv's own, because C++ for OpenCL with the generic address space disabled makes the implicit
-  `this`, unqualified pointers and references private. That is exactly what Metal's `thread` means, and it is the only way
-  uzu's `thread`-qualified methods and constructors compile. The shim therefore defines `thread` as nothing.
-- The kernels' own metadata is handled by a hand-written wrapper per kernel for now (`cases/*.cl`). uzu's kernels describe
-  their grid, threadgroup size, optional buffers and specialization values with annotations (`AXIS`, `GROUPS`, `THREADS`,
-  `SPECIALIZE`, `OPTIONAL`); a generator can emit the wrappers from those.
-
-## Shim layout
-
-```
-include/
-  metal_stdlib                 the shim; one file, sections in this order:
-                               address spaces (device/threadgroup/constant) and fixed-width ints,
-                               type traits (is_same_v, enable_if_t, integer_sequence, numeric_limits ...),
-                               vec<T,N> (native ext_vector for arithmetic types, struct for bfloat),
-                               bfloat, as_type, barriers, math (metal::, fast::, precise::),
-                               simd_* (sub_group_* builtins, vector aware shuffles),
-                               simdgroup_matrix<T,8,8> and simdgroup_multiply_accumulate
-  m2v_vec_ctors.h              generated by gen-shim-extras.py: Metal style short2(a, b), float4(x), float4(other)
-  MetalPerformancePrimitives/  stub; the MXU matrix path is an Apple M5 tensor unit feature and is never instantiated
-  metal_simdgroup, metal_atomic, ...   umbrella headers that forward to metal_stdlib (make-header-stubs.sh)
-cases/                         one wrapper per translated kernel: includes the .metal file, declares the OpenCL entry
-clspv-patches/                 apply-coopmat-lowering.py, applied to a clspv checkout
-probes/                        small experiments (cooperative matrix lane layout, noinline behaviour)
-m2v-run.c                      minimal Vulkan compute runner used by the tests
-m2v-test.py, m2v-debug.py      correctness and timing drivers
-m2v-mlx-base.py                baseline timings for the same ops from omarchy-mlx's hand written kernels
-census.py                      parse level census of every .metal file through the shim
-```
-
-### Address spaces and `thread`
-
-| Metal | shim |
-| --- | --- |
-| `device T*` | `__global T*` |
-| `threadgroup T*` | `__local T*` |
-| `constant T&` | `__constant T&` |
-| `thread` | nothing (private by default) |
-
-### simdgroup_matrix
-
-`simdgroup_matrix<T,8,8>` keeps Apple's per-lane fragment layout: two elements per lane, `row = (lane>>4&1)*4 + (lane>>1&3)`,
-`col0 = (lane>>3&1)*4 + (lane&1)*2`. uzu reads and writes `thread_elements()` directly, so the layout has to match. Honeykrisp's
-8x8 `VK_KHR_cooperative_matrix` fragment has the same layout for the accumulator, A and B uses (`probes/layout-run.py`
-checks all 32 lanes), so `simdgroup_multiply_accumulate` lowers to one `OpCooperativeMatrixMulAddKHR` with no data movement
-beyond element access. Without cooperative matrix, define `M2V_NO_COOPMAT` and the shim emulates the multiply with
-subgroup shuffles (about 30x slower).
-
-### clspv patches
-
-`clspv-patches/apply-coopmat-lowering.py` (tested against clspv `f2b01dd6dce7058585eb4bcdb5326997cfeebfd4`):
-
-1. new builtin `m2v_mma_f32(float2 a, float2 b, float2 c)` lowered to cooperative matrix load, mul-add and store through
-   function-scope matrix variables, plus the capability, extension, types and the Vulkan memory model that requires;
-2. the SPIR-V binary writer learns `OpTypeCooperativeMatrixKHR` and `OpCooperativeMatrixMulAddKHR`;
-3. `llvm.trap` is removed (fall-off-the-end paths in Metal kernels);
-4. C++ for OpenCL is compiled with the generic address space, pipes and device enqueue features disabled;
-5. the `Coherent` decoration is not emitted for modules that use `m2v_mma_f32`: the Vulkan memory model that cooperative matrix
-   requires bans it, and clspv adds it to storage buffers reached through atomics or volatile accesses (uzu's Gemm does).
-
-## Running a kernel
-
-clspv conventions the runner must follow (`m2v-run.c` does):
-
-- kernel arguments become storage buffers on set 0, binding = argument order;
-- plain-old-data arguments go to push constants after a 16 byte block of group/region offsets (zeros);
-- the workgroup size is spec constants 0 to 2 with default (1,1,1); set them from the reflection
-  (`PropertyRequiredWorkgroupSize`) or the kernel's `reqd_work_group_size`;
-- enable `VK_KHR_cooperative_matrix` and its feature when the module uses it.
-
-## Build
-
-Needs clang with C++ for OpenCL (tested with 23.1), SPIRV-Tools, the Vulkan loader and headers, cmake and ninja.
-
-```
+```bash
+git clone https://github.com/joshuaswarren/metal2vk
 git clone https://github.com/google/clspv && cd clspv
 git checkout f2b01dd6dce7058585eb4bcdb5326997cfeebfd4
 python3 utils/fetch_sources.py --shallow
-python3 /path/to/metal2vk/clspv-patches/apply-coopmat-lowering.py .
+../metal2vk/clspv-patches/apply-all.sh .
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCLSPV_BUILD_TESTS=OFF -B build && ninja -C build clspv
-
-git clone https://github.com/trymirai/uzu
-export UZU_ROOT=$PWD/uzu CLSPV=$PWD/clspv/build/bin/clspv
-./compile.sh out activation softmax tilematmul
-cc -O2 m2v-run.c -lvulkan -o m2v-run
+cd ..
 ```
 
-Cooperative matrix needs a driver that exposes it. Stock Mesa Honeykrisp does not yet; the omarchy-mlx fork ICD does.
+**2. Translate a kernel.** Take uzu's activation and softmax kernels, unmodified:
 
-## Status
+```bash
+git clone https://github.com/trymirai/uzu
+cd metal2vk
+export UZU_ROOT=$PWD/../uzu CLSPV=$PWD/../clspv/build/bin/clspv CLANG=clang-23 OPT=opt-23   # your clang 23 and opt 23
+./compile.sh out activation softmax
+```
 
-Measured on an Apple M1 Max (G13C) with the fork ICD, Mesa 26.3.0-devel. "Hand kernel" means the Vulkan kernel in
-[omarchy-mlx](https://github.com/joshuaswarren/omarchy-mlx), timed through mlx.
+`out/` now holds `activation.spv` and `softmax.spv` (Vulkan 1.3 SPIR-V, checked by `spirv-val`) and a `.json` next to each that
+says which buffer is which argument, plus the LLVM IR and the clspv log.
 
-| kernel (uzu source, unmodified) | result | translated | hand kernel |
-| --- | --- | --- | --- |
-| Softmax f32, 4096 x 4096 (`simd_max`, `simd_sum`, threadgroup memory) | max abs error 2.4e-7 | 733 us | 773 us |
-| Softmax f16, 4096 x 4096 | max abs error 2.4e-4 | 358 us | 403 us |
-| Activation SILU f32 / f16, 8M elements | max rel error 3.5e-7 / 3.8e-4 | 340 us / 340 us | not comparable (mlx composes it from several ops) |
-| 8x8 tile matmul from uzu's `SimdgroupMMA`, 1024^3 f32, one tile per subgroup, no reuse | max rel error 1.4e-6 | 0.81 TFLOP/s | 4.1 TFLOP/s (tiled GEMM) |
-| the same tile kernel, shuffle emulation instead of cooperative matrix | max rel error 1.4e-6 | 0.03 TFLOP/s | |
-| 4x4 register-tiled matmul from the same header, 1024^3 f32 | max rel error 1.1e-6 | 4.27 TFLOP/s | 4.07 TFLOP/s (tiled GEMM) |
-| uzu `Gemm` (`gemm.metal`, SimdgroupMmaCore, f32, Tile64x64x32), 1024^3 | max rel error 1.2e-6 | 1.42 TFLOP/s (0.35x of the hand GEMM; at 256^3 0.36 TFLOP/s) | 4.07 TFLOP/s |
+**3. Run it** on a machine with a Vulkan 1.3 GPU, for example Apple Silicon under Linux with Mesa's Honeykrisp driver, and compare
+with a CPU reference:
 
-uzu `Gemm` and clspv. The front end instantiates the whole SimdgroupMmaCore path, and with the typed-GEP front end route
-(the default, see `compile.sh`) clspv accepts it and the SPIR-V validates for the 8x32x32, 32x32x32 and 64x64x32 tilings. The three
-clspv failures seen first (an endless loop rebuilding uzu's `ThreadgroupLoader` from a `<4 x i16>`, `SimplifyPointerBitcastPass`
-not converging, and an `OpPhi` of a float pointer and a `[4 x i8]` pointer) all came from the front end: clang's InstCombine
-rewrites typed float GEPs into byte-offset GEPs, and clang -O0 leaves every function `noinline` with closures whose `this` is in
-the generic address space. The guards in `apply-coopmat-lowering.py` remain, so a future input that breaks those passes stops
-with the offending types instead of hanging. Null optional-buffer arguments crash the producer, so the wrapper binds real typed
-buffers for them; clspv drops the unused ones, and the test driver binds from the reflection JSON that `compile.sh` writes next
-to each module. Routing GEMM and quantized matmul to omarchy-mlx's tuned kernels (host shim) remains the plan for the hot path.
+```bash
+cc -O2 m2v-run.c -lvulkan -o m2v-run
+python3 m2v-test.py results ./m2v-run out activation softmax     # writes results/results.json
+```
 
-The tile matmul is a deliberately naive kernel built from uzu's header (no operand reuse), so its gap to a tiled GEMM says
-little about the lowering; the tiled `Gemm` is the real comparison and is the open item. A parse level census of all 55 uzu
-`.metal` files is in `census.py`.
+To translate one Metal file of your own, `tools/m2v-compile --msl kernel.metal --out DIR` does the same with a cache
+([docs/m2v-compile.md](docs/m2v-compile.md)).
 
-### Bulk sweep
+## How it works
 
-`sweep/` runs every uzu `.metal` file and every TensorFold Zig `.metal` file (610 entry points: kernel variants and host_name instantiations) through
-the shim, clang, clspv and spirv-val and keeps a per-kernel table. This gives valid Vulkan SPIR-V for 598 of the 610 entries,
-all 121 uzu kernels included. `docs/coverage.md` and `sweep/results/` hold the table and the first clspv or spirv-val message of every failing entry.
-`sweep/README.md` says how to rerun it.
+1. clang parses the Metal source as C++ for OpenCL against a small `metal_stdlib` shim (`include/`) that gives Metal's types, address
+   spaces, `simdgroup_matrix` and the other builtins.
+2. LLVM's inliner keeps the IR typed, and a few small scripts rewrite shapes that clspv cannot lower.
+3. A patched clspv turns the IR into Vulkan 1.3 compute SPIR-V; cooperative matrix operations use `VK_KHR_cooperative_matrix`.
+4. `spirv-val` checks the module; a pass that had to give up makes the build fail instead of keeping wrong code.
+5. The module runs on any Vulkan 1.3 device with 32-wide subgroups, storage buffers and push constants. The target is Honeykrisp,
+   Mesa's driver for Apple silicon.
 
-### Command line compile
+[docs/how-it-works.md](docs/how-it-works.md) has the details and the reasons for each choice.
 
-`tools/m2v-compile` is the host-facing front door over the same pipeline: one assembled Metal kernel file in, a
-spirv-val clean Vulkan SPIR-V plus a reflection JSON out, through a content-addressed cache. The contract
-(arguments, exit codes, cache layout, reflection fields) is `docs/m2v-compile.md`.
+## Limits
 
-## Working on it
+- **Not every kernel translates.** 598 of 610 do today; [docs/coverage.md](docs/coverage.md) lists the rest by cause, and
+  `sweep/results/FAILURES.md` has the first error of each. One group cannot translate with this design: kernels that keep a GPU
+  address inside a buffer need Vulkan's physical storage buffer pointers, which clspv supports only for 64-bit modules.
+- **Translated is not the same as correct.** A kernel was checked only if it is in the 31 above. Where Metal leaves the order of
+  floating-point sums or the rounding of `exp` open, results can differ in the last bits.
+- **Matrix multiplies are slower.** uzu's tiled matrix multiply runs at about 0.3 times the hand-tuned Vulkan kernel, so matrix
+  multiplies keep using hand-tuned kernels and metal2vk covers the many smaller ones.
+- **Newest-chip features.** One sampled kernel uses a Metal feature that only exists on the M5 chip and is refused by name. Metal 4's
+  tensor operations are emulated in the shim for the matrix layout that MLX, uzu and TensorFold pack for; a kernel written for Apple's
+  other (strict) layout translates but returns permuted results, and the shim header says which.
+- **Cooperative matrix needs a driver that offers it.** Stock Mesa Honeykrisp does not yet; the
+  [omarchy-mlx](https://github.com/joshuaswarren/omarchy-mlx) fork does.
+- **No whole-model speed number yet.** Kernel speed is measured; tokens per second through this route is not.
 
-Branches are per slice (`slice/coopmat`, `slice/sweep`, `slice/host`, `slice/bench`), merged into `main` through pull
-requests. Commits are signed. Keep each GPU submit short (the test drivers size their batches to about two seconds).
+## Status and roadmap
+
+metal2vk is a working translator with a growing, gated test: CI runs the whole uzu and TensorFold sweep on every pull request and
+fails if a kernel that used to translate stops translating.
+
+Next is whole engines on Linux, starting with oMLX. In the open omarchy-mlx pull request 70, 16 of 30 shipped ahead-of-time kernel
+modules already dispatch through metal2vk with no fallbacks and matching results; 13 more miss because the names the engine looks
+them up by differ from what this MLX build produces, which is being fixed.
+`host/` holds the host layer (buffers, queues, pipelines) that gives Metal-style host code a Vulkan backend.
+
+## Documentation
+
+- [What metal2vk enables](docs/what-this-enables.md): the measured results and what is not measured yet.
+- [How it works](docs/how-it-works.md): the pipeline, the shim, the clspv patches.
+- [Kernel measurements](docs/measurements.md) and [coverage by failure class](docs/coverage.md).
+- [m2v-compile](docs/m2v-compile.md): the command line front door and its reflection format.
+- [Host layer](host/DESIGN.md) and [bench harness](docs/bench-status.md).
+
+## Contributing
+
+Issues with a failing kernel and its first error message are the most useful thing you can send. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for how to run the sweep and the rules for shim and clspv changes.
 
 ## Support
 
-Every bit of support helps keep metal2vk alive and free. If you are able, [sponsor on GitHub](https://github.com/sponsors/joshuaswarren) or send a Lightning donation to `joshuaswarren@strike.me` to directly fund continued development and new integrations.
-
-[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?style=for-the-badge)](https://github.com/sponsors/joshuaswarren)
-
-If financial support is not an option, you can still make a big difference: [star the repo](https://github.com/joshuaswarren/metal2vk), share it, or recommend it to a colleague. Word of mouth is how most people find metal2vk.
+Every bit of support helps keep metal2vk alive and free. If you are able, [sponsor on GitHub](https://github.com/sponsors/joshuaswarren) or send a Lightning donation to `joshuaswarren@strike.me` to directly fund continued development and new integrations. If financial support is not an option, [star the repo](https://github.com/joshuaswarren/metal2vk), share it, or recommend it to a colleague.
 
 ## License
 
