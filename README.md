@@ -2,15 +2,47 @@
 
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink)](https://github.com/sponsors/joshuaswarren)
 
-Compile Metal Shading Language (MSL) compute kernels to Vulkan SPIR-V, without editing the kernels.
+Fast local AI on a Mac is trapped on macOS. Much of it gets its speed from GPU code written in Metal, Apple's GPU
+language, and Metal only exists on Apple's operating system.
 
-Projects that drive Apple GPUs through Metal ship their kernels as `.metal` files. metal2vk takes those files as they are,
-parses them as C++ for OpenCL against a small `metal_stdlib` shim, and lowers the result to Vulkan 1.3 compute SPIR-V with
-clspv. The target is Honeykrisp (Mesa's Vulkan driver for Apple silicon) on Linux, but the output is plain Vulkan: it needs a
-32-wide subgroup, storage buffers and push constants, and optionally `VK_KHR_cooperative_matrix`.
+metal2vk translates that Metal code into Vulkan, the open GPU standard that Linux uses. It reads the Metal files as they
+are, with open source tools only (clang, clspv and SPIRV-Tools) and no Apple software. The result runs on Apple Silicon
+under Linux through an open source Vulkan driver.
 
-Status: working prototype. Three real kernels from [uzu](https://github.com/trymirai/uzu) compile unmodified and run
-correct on Honeykrisp. uzu's tiled GEMM parses through the shim; the clspv stage for it is still an open problem (see Status).
+## What is measured
+
+| Measured | Result |
+|---|---|
+| Kernels from uzu and TensorFold that compile to valid Vulkan programs | 598 of 610 |
+| uzu kernels that compile | 121 of 121 |
+| oMLX, mlx-lm, mlx-vlm kernels sampled: compile | 31 of 32 |
+| Same kernels, run on an M1 and checked against a reference | 31 of 31 agree (5 values of about 9,200 differ by 2 to 3 units in the last place in one kernel; about 0.4% of the values in one attention kernel differ by at most 0.02% of their row's largest value) |
+| Refused | 1 kernel needs the M5 chip's tensor operations |
+| Simple tiled matrix multiply, M1 Max | 4.27 TFLOP/s (hand-tuned Vulkan: 4.07) |
+| uzu tiled matrix multiply, M1 Max | about 0.3 times the hand-tuned kernel |
+| Compile time per kernel | 1.8 s first time, 0.8 s cached |
+| Whole-model speed through this route | not measured yet |
+
+A kernel that fails to translate or fails its check is never run: it falls back to the older route or stops with an
+error that names the kernel. The reference is the original translator's output where it had one, otherwise a
+step-by-step Python model of the Metal source. [docs/what-this-enables.md](docs/what-this-enables.md) has the full
+account.
+
+What comes next: whole engines on Linux. The oMLX route is first, in
+[omarchy-mlx](https://github.com/joshuaswarren/omarchy-mlx). There is no tokens-per-second number for it yet.
+
+## Use it
+
+`tools/m2v-compile` takes one Metal kernel file and writes a Vulkan SPIR-V module and a description of its arguments
+(`docs/m2v-compile.md` has the arguments and exit codes). The toolchain needs clang with C++ for OpenCL, the patched
+clspv and SPIRV-Tools; the Build section below has the steps.
+
+## How it works
+
+Projects that drive Apple GPUs through Metal ship their kernels as `.metal` files. metal2vk parses them as C++ for
+OpenCL against a small `metal_stdlib` shim, and lowers the result to Vulkan 1.3 compute SPIR-V with clspv. The target is
+Honeykrisp (Mesa's Vulkan driver for Apple silicon) on Linux, but the output is plain Vulkan: it needs a 32-wide
+subgroup, storage buffers and push constants, and optionally `VK_KHR_cooperative_matrix`.
 
 ## Pipeline
 
@@ -159,10 +191,10 @@ little about the lowering; the tiled `Gemm` is the real comparison and is the op
 
 ### Bulk sweep
 
-`sweep/` runs every uzu `.metal` file and every TensorFold Zig `.metal` file (609 entry points: kernel variants and host_name instantiations) through
-the shim, clang, clspv and spirv-val and keeps a per-kernel table. On the typed-GEP route (clang 19) this shim gives valid Vulkan SPIR-V for 323
-of 609 entries (53.0%; main's shim gave 232, 38.1%). The ranked list of what still blocks the rest and the first clspv or spirv-val message of every failing entry are in
-`sweep/results/` (`FEATURES.md`, `FAILURES.md`, `table.tsv`). `sweep/README.md` says how to rerun it.
+`sweep/` runs every uzu `.metal` file and every TensorFold Zig `.metal` file (610 entry points: kernel variants and host_name instantiations) through
+the shim, clang, clspv and spirv-val and keeps a per-kernel table. This gives valid Vulkan SPIR-V for 598 of the 610 entries,
+all 121 uzu kernels included. `docs/coverage.md` and `sweep/results/` hold the table and the first clspv or spirv-val message of every failing entry.
+`sweep/README.md` says how to rerun it.
 
 ### Command line compile
 
