@@ -48,7 +48,7 @@ integer index plus indexed addressing). `sweep/m2v_sweep.py` and `compile.sh` ru
 
 ### clspv patches
 
-clspv is patched in `clspv-patches/`, 18 idempotent scripts tested against clspv `f2b01dd6dce7058585eb4bcdb5326997cfeebfd4`.
+clspv is patched in `clspv-patches/`: idempotent scripts, tested against clspv `f2b01dd6dce7058585eb4bcdb5326997cfeebfd4`.
 `tools/apply-clspv-patches.sh /path/to/clspv` applies them in the order the CI workflow uses. Each script's docstring says what it
 fixes and why. They fall into four groups:
 

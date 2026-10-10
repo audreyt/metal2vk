@@ -16,7 +16,7 @@ with `sweep/coverage-floor.txt`, the list of kernels that already produce valid 
 
 ```bash
 export UZU_ROOT=$PWD/uzu TF_ROOT=$PWD/TensorFold CLANG=clang-23 OPT=opt-23 CLSPV=$PWD/clspv/build/bin/clspv
-python3 sweep/m2v_sweep.py out --set all --jobs "$(nproc)" --tag local     # about a minute
+python3 sweep/m2v_sweep.py out --set all --jobs "$(nproc)" --tag local     # a few minutes on a multi-core machine
 python3 sweep/check_coverage.py out/local.json                              # fails if a kernel in the floor stopped working
 python3 sweep/check_coverage.py out/local.json --update                     # raise the floor in the PR that gains kernels
 python3 sweep/report.py out/local.json --table sweep/results/table.tsv --features sweep/results/FEATURES.md --failures sweep/results/FAILURES.md

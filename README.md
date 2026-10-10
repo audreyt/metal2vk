@@ -40,7 +40,7 @@ the Metal source.
 ## Quick start
 
 You need Linux, `git`, `python3` with `numpy`, `cmake` and `ninja`, clang and LLVM 23 (with C++ for OpenCL), SPIRV-Tools, and the
-Vulkan loader and headers. Running (the last step) needs a Vulkan 1.3 GPU; compiling does not.
+Vulkan loader and headers (1.3.255 or newer: the first headers that define `VK_KHR_cooperative_matrix`, which `m2v-run.c` uses). Running (the last step) needs a Vulkan 1.3 GPU; compiling does not.
 
 **1. Build the patched clspv.** metal2vk uses clspv at a pinned commit plus the patches in `clspv-patches/`:
 
@@ -110,9 +110,9 @@ To translate one Metal file of your own, `tools/m2v-compile --msl kernel.metal -
 metal2vk is a working translator with a growing, gated test: CI runs the whole uzu and TensorFold sweep on every pull request and
 fails if a kernel that used to translate stops translating.
 
-Next is whole engines on Linux, starting with oMLX. In the open omarchy-mlx pull request 70, 16 of 30 shipped ahead-of-time kernel
-modules already dispatch through metal2vk with no fallbacks and matching results; 13 more miss because the names the engine looks
-them up by differ from what this MLX build produces, which is being fixed.
+Next is whole engines on Linux, starting with oMLX. That route is the open omarchy-mlx pull request 70, which is not merged: it
+sends the engine's kernels through metal2vk, and checking that the GPU results match is its next gate. There is no
+tokens-per-second number for it yet.
 `host/` holds the host layer (buffers, queues, pipelines) that gives Metal-style host code a Vulkan backend.
 
 ## Documentation
