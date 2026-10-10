@@ -15,7 +15,7 @@ Measured, with the account of how in [docs/what-this-enables.md](docs/what-this-
 
 | Measured | Result |
 |---|---|
-| Kernels from uzu and TensorFold that compile to valid Vulkan programs | 598 of 610 |
+| Kernels from uzu and TensorFold that compile to valid Vulkan programs | 606 of 610 |
 | uzu kernels that compile | 121 of 121 |
 | oMLX, mlx-lm, mlx-vlm kernels sampled: compile | 31 of 32 |
 | Same kernels, run on an M1 and checked against a reference | 31 of 31 agree (5 values of about 9,200 differ by 2 to 3 units in the last place in one kernel; about 0.4% of the values in one attention kernel differ by at most 0.02% of their row's largest value) |
@@ -42,23 +42,31 @@ the Metal source.
 You need Linux, `git`, `python3` with `numpy`, `cmake` and `ninja`, clang and LLVM 23 (with C++ for OpenCL), SPIRV-Tools, and the
 Vulkan loader and headers (1.3.255 or newer: the first headers that define `VK_KHR_cooperative_matrix`, which `m2v-run.c` uses). Running (the last step) needs a Vulkan 1.3 GPU; compiling does not.
 
-**1. Build the patched clspv.** metal2vk uses clspv at a pinned commit plus the patches in `clspv-patches/`:
+**0. Get the code.** Everything below runs from one new directory:
 
 ```bash
+mkdir m2v && cd m2v
 git clone https://github.com/joshuaswarren/metal2vk
-git clone https://github.com/google/clspv && cd clspv
+git clone https://github.com/google/clspv
+git clone https://github.com/trymirai/uzu && git -C uzu checkout c92723bdc04e40f55286de458a457172ce62c5b6
+```
+
+**1. Build the patched clspv.** metal2vk uses clspv at a pinned commit plus the patches in `metal2vk/clspv-patches/`. From `m2v/`:
+
+```bash
+cd clspv
 git checkout f2b01dd6dce7058585eb4bcdb5326997cfeebfd4
 python3 utils/fetch_sources.py --shallow
 ../metal2vk/tools/apply-clspv-patches.sh .
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCLSPV_BUILD_TESTS=OFF -B build && ninja -C build clspv
-cd ..
+cd ../metal2vk
 ```
 
-**2. Translate a kernel.** Take uzu's activation and softmax kernels, unmodified:
+The build compiles LLVM, so it takes a while. You are back in `m2v/metal2vk/` afterwards.
+
+**2. Translate a kernel.** Take uzu's activation and softmax kernels, unmodified. From `m2v/metal2vk/`:
 
 ```bash
-git clone https://github.com/trymirai/uzu
-cd metal2vk
 export UZU_ROOT=$PWD/../uzu CLSPV=$PWD/../clspv/build/bin/clspv CLANG=clang-23 OPT=opt-23   # your clang 23 and opt 23
 ./compile.sh out activation softmax
 ```
@@ -67,7 +75,7 @@ export UZU_ROOT=$PWD/../uzu CLSPV=$PWD/../clspv/build/bin/clspv CLANG=clang-23 O
 says which buffer is which argument, plus the LLVM IR and the clspv log.
 
 **3. Run it** on a machine with a Vulkan 1.3 GPU, for example Apple Silicon under Linux with Mesa's Honeykrisp driver, and compare
-with a CPU reference:
+with a CPU reference. Still in `m2v/metal2vk/`:
 
 ```bash
 cc -O2 m2v-run.c -lvulkan -o m2v-run
@@ -91,7 +99,7 @@ To translate one Metal file of your own, `tools/m2v-compile --msl kernel.metal -
 
 ## Limits
 
-- **Not every kernel translates.** 598 of 610 do today; [docs/coverage.md](docs/coverage.md) lists the rest by cause, and
+- **Not every kernel translates.** 606 of 610 do today; [docs/coverage.md](docs/coverage.md) lists the rest by cause, and
   `sweep/results/FAILURES.md` has the first error of each. One group still fails: kernels that keep a GPU address inside a buffer
   (a pointer used as runtime data). They need a change to the driver's argument model or to clspv's physical-pointer support.
 - **Translated is not the same as correct.** A kernel was checked only if it is in the 31 above. Where Metal leaves the order of

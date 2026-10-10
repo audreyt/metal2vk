@@ -6,7 +6,7 @@ on Apple Silicon under Linux through an open source Vulkan driver, with no Apple
 these kernels are the ones whose speed comes from custom code: Qwen3.5-class mixture-of-experts models and gated-delta-net
 models served through oMLX, mlx-lm and mlx-vlm, the Mirai uzu engine, and the TensorFold Zig engine.
 
-What has been measured so far: out of 610 Metal kernels taken from the real uzu and TensorFold sources, 598 compile to valid
+What has been measured so far: out of 610 Metal kernels taken from the real uzu and TensorFold sources, 606 compile to valid
 Vulkan programs, including all 121 uzu kernels. Of 32 sampled oMLX, mlx-lm and mlx-vlm kernels, 31 compile. These 31 were run
 on an M1 and checked against a reference (the original translator's output where it had one, otherwise a step-by-step Python
 model of the Metal source), and all 31 agree. Two differences stay inside what the Metal source leaves open. Five values out
@@ -26,7 +26,7 @@ seconds the first time and 0.8 seconds when cached.
 
 | Measured | Result |
 |---|---|
-| Kernels from uzu and TensorFold that compile to valid Vulkan programs | 598 of 610 |
+| Kernels from uzu and TensorFold that compile to valid Vulkan programs | 606 of 610 |
 | uzu kernels that compile | 121 of 121 |
 | oMLX, mlx-lm, mlx-vlm kernels sampled: compile | 31 of 32 |
 | Same kernels, run on an M1 and checked against a reference | 31 of 31 agree (5 values of about 9,200 differ by 2 to 3 units in the last place in one kernel; about 0.4% of the values in one attention kernel differ by at most 0.02% of their row's largest value) |
