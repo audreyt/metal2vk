@@ -5,7 +5,7 @@ Run Metal GPU kernels on Linux: metal2vk translates Apple's Metal compute code t
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink)](https://github.com/sponsors/joshuaswarren)
 
 The fast local AI software for Apple Silicon (oMLX, mlx-lm, mlx-vlm, the uzu and TensorFold engines) gets its speed from GPU kernels
-written in Metal, Apple's GPU language, and Metal only exists on macOS. metal2vk reads those kernels as they are and translates them
+written in Metal, Apple's GPU language, and Metal only exists on Apple's operating systems. metal2vk reads those kernels as they are and translates them
 to Vulkan with clang, clspv and SPIRV-Tools, with no Apple software, so they can run on Apple Silicon under Linux through an open
 source Vulkan driver.
 
@@ -92,8 +92,8 @@ To translate one Metal file of your own, `tools/m2v-compile --msl kernel.metal -
 ## Limits
 
 - **Not every kernel translates.** 598 of 610 do today; [docs/coverage.md](docs/coverage.md) lists the rest by cause, and
-  `sweep/results/FAILURES.md` has the first error of each. One group cannot translate with this design: kernels that keep a GPU
-  address inside a buffer need Vulkan's physical storage buffer pointers, which clspv supports only for 64-bit modules.
+  `sweep/results/FAILURES.md` has the first error of each. One group still fails: kernels that keep a GPU address inside a buffer
+  (a pointer used as runtime data). They need a change to the driver's argument model or to clspv's physical-pointer support.
 - **Translated is not the same as correct.** A kernel was checked only if it is in the 31 above. Where Metal leaves the order of
   floating-point sums or the rounding of `exp` open, results can differ in the last bits.
 - **Matrix multiplies are slower.** uzu's tiled matrix multiply runs at about 0.3 times the hand-tuned Vulkan kernel, so matrix
@@ -110,9 +110,10 @@ To translate one Metal file of your own, `tools/m2v-compile --msl kernel.metal -
 metal2vk is a working translator with a growing, gated test: CI runs the whole uzu and TensorFold sweep on every pull request and
 fails if a kernel that used to translate stops translating.
 
-Next is whole engines on Linux, starting with oMLX. That route is the open omarchy-mlx pull request 70, which is not merged: it
-sends the engine's kernels through metal2vk, and checking that the GPU results match is its next gate. There is no
-tokens-per-second number for it yet.
+Next is whole engines on Linux, starting with oMLX. That route is the open omarchy-mlx pull request 70 (not merged). It is opt-in
+through an environment variable and the default stays the old translator. Checking that the GPU results match is its next gate, and
+there is no tokens-per-second number for it yet.
+
 `host/` holds the host layer (buffers, queues, pipelines) that gives Metal-style host code a Vulkan backend.
 
 ## Documentation

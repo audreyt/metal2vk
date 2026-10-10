@@ -15,7 +15,7 @@ Measured on an Apple M1 Max with the omarchy-mlx fork of the driver (Mesa 26.3.0
 | 8x8 tile matmul from uzu's `SimdgroupMMA`, 1024^3 f32, one tile per subgroup, no reuse | max rel error 1.4e-6 | 0.81 TFLOP/s | 4.1 TFLOP/s (tiled GEMM) |
 | the same tile kernel, shuffle emulation instead of cooperative matrix | max rel error 1.4e-6 | 0.03 TFLOP/s | |
 | 4x4 register-tiled matmul from the same header, 1024^3 f32 | max rel error 1.1e-6 | 4.27 TFLOP/s | 4.07 TFLOP/s (tiled GEMM) |
-| uzu `Gemm` (`gemm.metal`, SimdgroupMmaCore, f32, Tile64x64x32), 1024^3 | max rel error 1.2e-6 | 1.42 TFLOP/s (about 0.3x of the hand GEMM; at 256^3 0.36 TFLOP/s) | 4.07 TFLOP/s |
+| uzu `Gemm` (`gemm.metal`, SimdgroupMmaCore, f32, Tile64x64x32), 1024^3 | max rel error 1.2e-6 | 1.42 TFLOP/s (1.42 / 4.07 = 0.35 of the hand GEMM, the "about 0.3" of the README; at 256^3 0.36 TFLOP/s) | 4.07 TFLOP/s |
 
 ## Reading the table
 
