@@ -4,10 +4,7 @@ Run Metal GPU kernels on Linux: metal2vk translates Apple's Metal compute code t
 
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink)](https://github.com/sponsors/joshuaswarren)
 
-The fast local AI software for Apple Silicon (oMLX, mlx-lm, mlx-vlm, the uzu and TensorFold engines) gets its speed from GPU kernels
-written in Metal, Apple's GPU language, and Metal only exists on Apple's operating systems. metal2vk reads those kernels as they are and translates them
-to Vulkan with clang, clspv and SPIRV-Tools, with no Apple software, so they can run on Apple Silicon under Linux through an open
-source Vulkan driver.
+The fast local AI software for Apple Silicon gets its speed from GPU kernels. That software includes oMLX, mlx-lm, mlx-vlm and the uzu and TensorFold engines. The kernels are written in Metal, Apple's GPU language. Metal only exists on Apple's operating systems. This project reads those kernels as they are. It translates them to Vulkan with clang, clspv and SPIRV-Tools, with no Apple software. They can then run on Apple Silicon under Linux through an open source Vulkan driver.
 
 ## What works today
 
@@ -25,22 +22,19 @@ Measured, with the account of how in [docs/what-this-enables.md](docs/what-this-
 | Compile time per kernel | 1.8 s first time, 0.8 s cached |
 | Whole-model speed through this route | not measured yet |
 
-A kernel that fails to translate or fails its check is never run: it falls back to the older route or stops with an error that names
-the kernel. The reference for a check is the original translator's output where it had one, otherwise a step-by-step Python model of
-the Metal source.
+A kernel that fails to translate or fails its check is never run. It falls back to the older route or stops with an error that names the kernel. The reference for a check is the original translator's output where it had one. Otherwise it is a step-by-step Python model of the Metal source.
 
 ## Why it matters
 
-- **Linux gets the Mac's kernels.** The speed of these engines is in their custom kernels. Translating the Metal source avoids
-  rewriting each kernel in another language.
-- **The long tail works.** The models that depend on custom kernels (Qwen3.5-class mixture-of-experts and gated-delta-net models
-  served through oMLX, mlx-lm and mlx-vlm, and the uzu and TensorFold engines) are the ones a plain port misses.
-- **It is open end to end.** clang, clspv, SPIRV-Tools and Mesa's Vulkan driver for Apple silicon. Nothing from Apple is needed.
+Linux gets the Mac's kernels. The speed of these engines is in their custom kernels. Translating the Metal source avoids rewriting each kernel in another language.
+
+The long tail works too. The models that depend on custom kernels are the ones a plain port misses. They are Qwen3.5-class mixture-of-experts and gated-delta-net models, served through oMLX, mlx-lm and mlx-vlm, and the uzu and TensorFold engines.
+
+It is open end to end. The pieces are clang, clspv, SPIRV-Tools and Mesa's Vulkan driver for Apple silicon. Nothing from Apple is needed.
 
 ## Quick start
 
-You need Linux, `git`, `python3` with `numpy`, `cmake` and `ninja`, clang and LLVM 23 (with C++ for OpenCL), SPIRV-Tools, and the
-Vulkan loader and headers (1.3.255 or newer: the first headers that define `VK_KHR_cooperative_matrix`, which `m2v-run.c` uses). Running (the last step) needs a Vulkan 1.3 GPU; compiling does not.
+You need Linux, `git`, `python3` with `numpy`, `cmake` and `ninja`, clang and LLVM 23 (with C++ for OpenCL), SPIRV-Tools, and the Vulkan loader and headers. The headers must be 1.3.255 or newer, the first that define `VK_KHR_cooperative_matrix`, which `m2v-run.c` uses. Running (the last step) needs a Vulkan 1.3 GPU. Compiling does not.
 
 **0. Get the code.** Everything below runs from one new directory:
 
@@ -71,71 +65,60 @@ export UZU_ROOT=$PWD/../uzu CLSPV=$PWD/../clspv/build/bin/clspv CLANG=clang-23 O
 ./compile.sh out activation softmax
 ```
 
-`out/` now holds `activation.spv` and `softmax.spv` (Vulkan 1.3 SPIR-V, checked by `spirv-val`) and a `.json` next to each that
-says which buffer is which argument, plus the LLVM IR and the clspv log.
+The folder `out/` now holds `activation.spv` and `softmax.spv`. They are Vulkan 1.3 SPIR-V, checked by `spirv-val`. Next to each is a `.json` that says which buffer is which argument. You also get the LLVM IR and the clspv log.
 
-**3. Run it** on a machine with a Vulkan 1.3 GPU, for example Apple Silicon under Linux with Mesa's Honeykrisp driver, and compare
-with a CPU reference. Still in `m2v/metal2vk/`:
+**3. Run it** on a machine with a Vulkan 1.3 GPU. One example is Apple Silicon under Linux with Mesa's Honeykrisp driver. The script compares the result with a CPU reference. Still in `m2v/metal2vk/`:
 
 ```bash
 cc -O2 m2v-run.c -lvulkan -o m2v-run
 python3 m2v-test.py results ./m2v-run out activation softmax     # writes results/results.json
 ```
 
-To translate one Metal file of your own, `tools/m2v-compile --msl kernel.metal --out DIR` does the same with a cache
-([docs/m2v-compile.md](docs/m2v-compile.md)).
+To translate one Metal file of your own, run `tools/m2v-compile --msl kernel.metal --out DIR`. It does the same with a cache. See [docs/m2v-compile.md](docs/m2v-compile.md).
 
 ## How it works
 
-1. clang parses the Metal source as C++ for OpenCL against a small `metal_stdlib` shim (`include/`) that gives Metal's types, address
-   spaces, `simdgroup_matrix` and the other builtins.
-2. LLVM's inliner keeps the IR typed, and a few small scripts rewrite shapes that clspv cannot lower.
-3. A patched clspv turns the IR into Vulkan 1.3 compute SPIR-V; cooperative matrix operations use `VK_KHR_cooperative_matrix`.
-4. `spirv-val` checks the module; a pass that had to give up makes the build fail instead of keeping wrong code.
-5. The module runs on any Vulkan 1.3 device with 32-wide subgroups, storage buffers and push constants. The target is Honeykrisp,
-   Mesa's driver for Apple silicon.
+First, clang parses the Metal source as C++ for OpenCL. It uses a small `metal_stdlib` shim (`include/`) that gives Metal's types, address spaces, `simdgroup_matrix` and the other builtins.
 
-[docs/how-it-works.md](docs/how-it-works.md) has the details and the reasons for each choice.
+Second, LLVM's inliner keeps the IR typed. A few small scripts rewrite shapes that clspv cannot lower.
+
+Third, a patched clspv turns the IR into Vulkan 1.3 compute SPIR-V. Cooperative matrix operations use `VK_KHR_cooperative_matrix`.
+
+Fourth, `spirv-val` checks the module. A pass that had to give up makes the build fail instead of keeping wrong code.
+
+Fifth, the module runs on any Vulkan 1.3 device with 32-wide subgroups, storage buffers and push constants. The target is Honeykrisp, Mesa's driver for Apple silicon.
+
+See [docs/how-it-works.md](docs/how-it-works.md) for the details and the reasons for each choice.
 
 ## Limits
 
-- **Not every kernel translates.** 606 of 610 do today; [docs/coverage.md](docs/coverage.md) lists the rest by cause, and
-  `sweep/results/FAILURES.md` has the first error of each. One group still fails: kernels that keep a GPU address inside a buffer
-  (a pointer used as runtime data). They need a change to the driver's argument model or to clspv's physical-pointer support.
-- **Translated is not the same as correct.** A kernel was checked only if it is in the 31 above. Where Metal leaves the order of
-  floating-point sums or the rounding of `exp` open, results can differ in the last bits.
-- **Matrix multiplies are slower.** uzu's tiled matrix multiply runs at about 0.3 times the hand-tuned Vulkan kernel, so matrix
-  multiplies keep using hand-tuned kernels and metal2vk covers the many smaller ones.
-- **Newest-chip features.** One sampled kernel uses a Metal feature that only exists on the M5 chip and is refused by name. Metal 4's
-  tensor operations are emulated in the shim for the matrix layout that MLX, uzu and TensorFold pack for; a kernel written for Apple's
-  other (strict) layout translates but returns permuted results, and the shim header says which.
-- **Cooperative matrix needs a driver that offers it.** Stock Mesa Honeykrisp does not yet; the
-  [omarchy-mlx](https://github.com/joshuaswarren/omarchy-mlx) fork does.
-- **No whole-model speed number yet.** Kernel speed is measured; tokens per second through this route is not.
+Not every kernel translates. 606 of 610 do today. See [docs/coverage.md](docs/coverage.md) for the rest by cause. The file `sweep/results/FAILURES.md` has the first error of each. One group still fails. It is the kernels that keep a GPU address inside a buffer, a pointer used as runtime data. They need a change to the driver's argument model or to clspv's physical-pointer support.
+
+Translated is not the same as correct. A kernel was checked only if it is in the 31 above. Where Metal leaves the order of floating-point sums or the rounding of `exp` open, results can differ in the last bits.
+
+Matrix multiplies are slower. uzu's tiled matrix multiply runs at about 0.3 times the hand-tuned Vulkan kernel. Matrix multiplies therefore keep using hand-tuned kernels. The translator covers the many smaller ones.
+
+Newest-chip features need care. One sampled kernel uses a Metal feature that only exists on the M5 chip. It is refused by name. Metal 4's tensor operations are emulated in the shim for the matrix layout that MLX, uzu and TensorFold pack for. A kernel written for Apple's other (strict) layout translates but returns permuted results. The shim header says which.
+
+Cooperative matrix needs a driver that offers it. Stock Mesa Honeykrisp does not yet. The [omarchy-mlx](https://github.com/joshuaswarren/omarchy-mlx) fork does.
+
+There is no whole-model speed number yet. Kernel speed is measured. Tokens per second through this route is not.
 
 ## Status and roadmap
 
-metal2vk is a working translator with a growing, gated test: CI runs the whole uzu and TensorFold sweep on every pull request and
-fails if a kernel that used to translate stops translating.
+The translator works and has a growing, gated test. CI runs the whole uzu and TensorFold sweep on every pull request. It fails if a kernel that used to translate stops translating.
 
-Next is whole engines on Linux, starting with oMLX. That route is the open omarchy-mlx pull request 70 (not merged). It is opt-in
-through an environment variable and the default stays the old translator. Checking that the GPU results match is its next gate, and
-there is no tokens-per-second number for it yet.
+Next is whole engines on Linux, starting with oMLX. That route is the open omarchy-mlx pull request 70 (not merged). It is opt-in through an environment variable. The default stays the old translator. Checking that the GPU results match is its next gate. There is no tokens-per-second number for it yet.
 
-`host/` holds the host layer (buffers, queues, pipelines) that gives Metal-style host code a Vulkan backend.
+The `host/` directory holds the host layer (buffers, queues, pipelines). It gives Metal-style host code a Vulkan backend.
 
 ## Documentation
 
-- [What metal2vk enables](docs/what-this-enables.md): the measured results and what is not measured yet.
-- [How it works](docs/how-it-works.md): the pipeline, the shim, the clspv patches.
-- [Kernel measurements](docs/measurements.md) and [coverage by failure class](docs/coverage.md).
-- [m2v-compile](docs/m2v-compile.md): the command line front door and its reflection format.
-- [Host layer](host/DESIGN.md) and [bench harness](docs/bench-status.md).
+Read [What metal2vk enables](docs/what-this-enables.md) for the measured results and what is not measured yet. [How it works](docs/how-it-works.md) covers the pipeline, the shim and the clspv patches. [Kernel measurements](docs/measurements.md) and [coverage by failure class](docs/coverage.md) have the numbers. [m2v-compile](docs/m2v-compile.md) describes the command line front door and its reflection format. The [host layer](host/DESIGN.md) and the [bench harness](docs/bench-status.md) are documented too.
 
 ## Contributing
 
-Issues with a failing kernel and its first error message are the most useful thing you can send. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for how to run the sweep and the rules for shim and clspv changes.
+Issues with a failing kernel and its first error message are the most useful thing you can send. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to run the sweep and the rules for shim and clspv changes.
 
 ## Support
 

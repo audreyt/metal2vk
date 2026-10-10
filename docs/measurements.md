@@ -1,11 +1,8 @@
 # Kernel measurements
 
-Per-kernel results for uzu kernels, translated unmodified and run through the open source Vulkan driver. For the headline numbers
-(how many kernels translate, how many were checked against a reference) see [what-this-enables.md](what-this-enables.md); for
-what fails and why, [coverage.md](coverage.md).
+This page has per-kernel results for uzu kernels, translated unmodified and run through the open source Vulkan driver. For the headline numbers, see [what-this-enables.md](what-this-enables.md). They say how many kernels translate and how many were checked against a reference. [coverage.md](coverage.md) says what fails and why.
 
-Measured on an Apple M1 Max with the omarchy-mlx fork of the driver (Mesa 26.3.0-devel). "Hand kernel" is the Vulkan kernel in
-[omarchy-mlx](https://github.com/joshuaswarren/omarchy-mlx), timed through mlx.
+The kernels ran on an Apple M1 Max with the omarchy-mlx fork of the driver (Mesa 26.3.0-devel). The "hand kernel" is the Vulkan kernel in [omarchy-mlx](https://github.com/joshuaswarren/omarchy-mlx), timed through mlx.
 
 | kernel (uzu source, unmodified) | result | translated | hand kernel |
 | --- | --- | --- | --- |
@@ -19,20 +16,14 @@ Measured on an Apple M1 Max with the omarchy-mlx fork of the driver (Mesa 26.3.0
 
 ## Reading the table
 
-- The 8x8 tile matmul is a deliberately naive kernel built from uzu's header (no operand reuse), so its gap to a tiled GEMM says
-  little about the translation. uzu's tiled `Gemm` is the real comparison, and at about 0.3 of the hand-tuned GEMM it is why
-  matrix multiplies keep using the hand-tuned kernels while metal2vk covers the long tail of smaller kernels.
-- `Gemm` compiles and validates for the 8x32x32, 32x32x32 and 64x64x32 tilings. Its first failures in clspv all came from the
-  front end's output (clang's InstCombine turning typed float addressing into byte addressing, and `noinline` closures); the typed
-  route in [how-it-works.md](how-it-works.md) fixes that. The guards in `clspv-patches/apply-coopmat-lowering.py` remain, so an input
-  that breaks those passes stops with the offending types instead of hanging.
-- Null optional-buffer arguments crash clspv's producer, so the wrappers bind real typed buffers for them. clspv drops unused
-  arguments; the test drivers bind from the reflection JSON that `compile.sh` writes next to each module.
-- Cooperative matrix needs a driver that exposes `VK_KHR_cooperative_matrix`. Stock Mesa Honeykrisp does not yet; the omarchy-mlx
-  fork does.
+The 8x8 tile matmul is a deliberately naive kernel built from uzu's header, with no operand reuse. Its gap to a tiled GEMM says little about the translation. uzu's tiled `Gemm` is the real comparison. At about 0.3 of the hand-tuned GEMM, it is why matrix multiplies keep using the hand-tuned kernels. The translator covers the long tail of smaller kernels.
+
+The `Gemm` kernel compiles and validates for the 8x32x32, 32x32x32 and 64x64x32 tilings. Its first failures in clspv all came from the front end's output. clang's InstCombine turned typed float addressing into byte addressing, and `noinline` closures got in the way. The typed route in [how-it-works.md](how-it-works.md) fixes that. The guards in `clspv-patches/apply-coopmat-lowering.py` remain. An input that breaks those passes stops with the offending types instead of hanging.
+
+Null optional-buffer arguments crash clspv's producer. The wrappers bind real typed buffers for them. clspv drops unused arguments. The test drivers bind from the reflection JSON that `compile.sh` writes next to each module.
+
+Cooperative matrix needs a driver that exposes `VK_KHR_cooperative_matrix`. Stock Mesa Honeykrisp does not yet. The omarchy-mlx fork does.
 
 ## More
 
-- `bench/` holds the harness that produced these rows and the latest result files ([bench-status.md](bench-status.md)).
-- [gemm-gap.md](gemm-gap.md) has the measurements for the `Gemm` gap and what they rule out.
-- `census.py` parses every uzu `.metal` file through the shim.
+The directory `bench/` holds the harness that produced these rows and the latest result files. See [bench-status.md](bench-status.md). The note [gemm-gap.md](gemm-gap.md) has the measurements for the `Gemm` gap and what they rule out. The script `census.py` parses every uzu `.metal` file through the shim.
