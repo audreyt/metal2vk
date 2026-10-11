@@ -26,7 +26,7 @@ template <int Dim, int RepeatCount, int Blocks, int KPackedWidth, int VPackedWid
         constexpr int v_bits = 4;
         typedef float U;
 
-        // Thread identity — matches sdpa_vector_2pass_1 layout
+        // Thread identity  -  matches sdpa_vector_2pass_1 layout
         auto kv_head_idx = threadgroup_position_in_grid.x;
         auto batch_idx = threadgroup_position_in_grid.y;
         auto block_idx = threadgroup_position_in_grid.z;
@@ -65,7 +65,7 @@ template <int Dim, int RepeatCount, int Blocks, int KPackedWidth, int VPackedWid
         for (int t = block_idx; t < (int)token_count; t += Blocks) {
             U kn = static_cast<U>(k_nm[t]);
 
-            // Key score — unrolled byte extraction
+            // Key score  -  unrolled byte extraction
             auto kb = (const device uint8_t*)(k_pk + t * KPackedWidth) + k_byte_base;
             U score = q[0] * key_codebook[kb[0] & 15u]
                 + q[1] * key_codebook[(kb[0] >> 4) & 15u];

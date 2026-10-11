@@ -82,7 +82,7 @@ template <int Dim, int KPackedWidth, int VPackedWidth>
         }
         threadgroup_barrier(mem_flags::mem_threadgroup);
 
-        // Step 5: Pack indices — thread-per-word, race-free, no atomics.
+        // Step 5: Pack indices  -  thread-per-word, race-free, no atomics.
         // Each thread d (d < pw) walks the dims whose
         // [i*bits, (i+1)*bits) range intersects [32d, 32(d+1)) and
         // accumulates them into a private register, then writes the

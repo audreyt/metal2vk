@@ -26,7 +26,7 @@ template <int Dim, int RepeatCount, int KPackedWidth, int VPackedWidth>
 
         typedef float U;
 
-        // Thread identity — grid is total threads, so use threadgroup position
+        // Thread identity  -  grid is total threads, so use threadgroup position
         auto bqh = threadgroup_position_in_grid.x;  // batch*q_head index
         auto simd_gid = simdgroup_index_in_threadgroup;
         auto simd_lid = thread_index_in_simdgroup;
@@ -68,7 +68,7 @@ template <int Dim, int RepeatCount, int KPackedWidth, int VPackedWidth>
         for (int t = simd_gid; t < (int)token_count; t += BN) {
             U kn = static_cast<U>(k_nm[t]);
 
-            // Key score — unrolled byte extraction
+            // Key score  -  unrolled byte extraction
             auto kb = (const device uint8_t*)(k_pk + t * KPackedWidth) + k_byte_base;
             U score = q[0] * key_codebook[kb[0] & 15u]
                 + q[1] * key_codebook[(kb[0] >> 4) & 15u];
@@ -84,7 +84,7 @@ template <int Dim, int RepeatCount, int KPackedWidth, int VPackedWidth>
             max_score = new_max;
             sum_exp_score = sum_exp_score * factor + exp_score;
 
-            // Value accumulation — unrolled byte extraction
+            // Value accumulation  -  unrolled byte extraction
                         o[0] = o[0] * factor + exp_score * val_codebook[vb[0] & 15u] * vn;
             o[1] = o[1] * factor + exp_score * val_codebook[(vb[0] >> 4) & 15u] * vn;
         }
@@ -115,7 +115,7 @@ template <int Dim, int RepeatCount, int KPackedWidth, int VPackedWidth>
             threadgroup_barrier(mem_flags::mem_threadgroup);
         }
 
-        // Write output (in rotated space — caller applies inverse rotation)
+        // Write output (in rotated space  -  caller applies inverse rotation)
         if (simd_lid == 0) {
             for (int i = 0; i < v_per_thread; i++) {
                 out[bqh * Dim + simd_gid * v_per_thread + i] = static_cast<U>(o[i]);
