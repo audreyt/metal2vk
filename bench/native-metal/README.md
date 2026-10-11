@@ -2,6 +2,8 @@
 
 This harness compiles the flattened uzu kernels at run time with Metal. It uses the same shapes, grids, buffer order, constants, iteration sizing, and CPU checks as `bench/m2v-bench.py`. It needs a Mac with a Metal device and `swiftc` from Xcode Command Line Tools or Xcode. It does not need the `metal` command-line compiler or a uzu checkout.
 
+The kernel sources come from uzu and keep its MIT license. The full text is in [LICENSE-uzu](LICENSE-uzu).
+
 ## Run
 
 From this directory, run:
