@@ -40,13 +40,12 @@ def function_desc(kernel, spv_off, spv_len, constants_by_name, regions):
     # it or the driver sees a shader push block the layout does not describe.
     region_end = max((r["offset"] + r["size"] for r in regions.values()), default=0)
     wg = kernel.get("workgroup_size") or [1, 1, 1]
-    wg_spec = None if kernel.get("workgroup_size") else None
     return {
         "name": kernel["name"],
         "entry": kernel["name"],
         "spv": {"offset": spv_off, "len": spv_len},
         "workgroup_size": wg,
-        "workgroup_size_spec_ids": wg_spec,
+        "workgroup_size_spec_ids": None,
         "buffers": sorted(buffers, key=lambda b: b["arg"]),
         "push": {"size": max(pod_end, region_end), "words": push_words},
         "constants": constants_by_name.get(kernel["name"], []),

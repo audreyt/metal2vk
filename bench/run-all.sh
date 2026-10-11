@@ -6,7 +6,7 @@
 #      typed-GEP route, see docs/bench-status.md). bench/env-local.sh (untracked; template:
 #      bench/env-local.sh.template) is sourced when present.
 # Compiles the registered cases, prints the translated-vs-hand table, runs the tuning sweep.
-# Trailing args go to m2v-bench.py only.
+# Trailing args go to m2v-bench.py. --device and --icd (with their values) also go to sweep.py.
 set -eu
 OUT=${1:?outdir}
 shift || true
@@ -23,6 +23,12 @@ export M2V_OPT=${M2V_OPT:--O0 -Xclang -disable-O0-optnone}
 [ -n "${M2V_ICD:-}" ] && export VK_DRIVER_FILES=${VK_DRIVER_FILES:-$M2V_ICD}
 bash "$H/compile.sh" "$SPV" activation softmax tilematmul tilematmul_rt
 "$PY" "$H/bench/m2v-bench.py" "$OUT" --spvdir "$SPV" --mlx-python "$PY" "$@"
-"$PY" "$H/bench/sweep.py" "$OUT" --spvroot "$OUT/spv-sweep"
+sweep_args=()
+prev=
+for a in "$@"; do
+  case "$prev" in --device|--icd) sweep_args+=("$prev" "$a") ;; esac
+  prev=$a
+done
+"$PY" "$H/bench/sweep.py" "$OUT" --spvroot "$OUT/spv-sweep" "${sweep_args[@]+"${sweep_args[@]}"}"
 # the receipts land in bench/ (results-<device>-<date>.json, sweep-<device>-<date>.json)
 cp -f "$OUT"/results-*.json "$OUT"/sweep-*.json "$H/bench/" 2>/dev/null || true
