@@ -27,6 +27,7 @@ sweep_args=()
 prev=
 for a in "$@"; do
   case "$prev" in --device|--icd) sweep_args+=("$prev" "$a") ;; esac
+  case "$a" in --device=*|--icd=*) sweep_args+=("$a") ;; esac
   prev=$a
 done
 "$PY" "$H/bench/sweep.py" "$OUT" --spvroot "$OUT/spv-sweep" "${sweep_args[@]+"${sweep_args[@]}"}"
