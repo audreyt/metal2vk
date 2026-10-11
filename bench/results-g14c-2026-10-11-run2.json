@@ -1,0 +1,223 @@
+{
+ "device": "g14c",
+ "device_name": null,
+ "driver": "",
+ "icd": "M2V_ICD",
+ "date": "2026-10-11",
+ "runner": "m2v-run",
+ "spvdir": "spv",
+ "rows": {
+  "activation_f32": {
+   "us": 287.6292,
+   "info": "iters=500 ts_per_us=284.59 wall_per_us=287.63",
+   "err": 3.5129223203378244e-07,
+   "ok": true,
+   "tol": 2e-05,
+   "metric": "GBps",
+   "value": 233.31728489318886,
+   "dtype": "f32",
+   "n": 8388608,
+   "hand": {
+    "fused": {
+     "us": 1377.16,
+     "GBps": 48.7
+    },
+    "unfused": {
+     "us": 637.33,
+     "GBps": 105.3
+    }
+   }
+  },
+  "activation_f16": {
+   "us": 275.869,
+   "info": "iters=500 ts_per_us=272.94 wall_per_us=275.87",
+   "err": 0.00038303539174362066,
+   "ok": true,
+   "tol": 0.002,
+   "metric": "GBps",
+   "value": 121.63176000202995,
+   "dtype": "f16",
+   "n": 8388608,
+   "hand": {
+    "fused": {
+     "us": 136.12,
+     "GBps": 246.5
+    },
+    "unfused": {
+     "us": 319.33,
+     "GBps": 105.1
+    }
+   }
+  },
+  "softmax_f32": {
+   "us": 465.031,
+   "info": "iters=500 ts_per_us=461.51 wall_per_us=465.03",
+   "err": 2.3616258582048744e-07,
+   "ok": true,
+   "tol": 1e-05,
+   "metric": "GBps",
+   "value": 288.62103386655946,
+   "dtype": "f32",
+   "n": 4096,
+   "hand": {
+    "fused": {
+     "us": 614.49,
+     "GBps": 218.4
+    }
+   }
+  },
+  "softmax_f16": {
+   "us": 255.765,
+   "info": "iters=500 ts_per_us=253.16 wall_per_us=255.76",
+   "err": 0.00024079057576986695,
+   "ok": true,
+   "tol": 0.002,
+   "metric": "GBps",
+   "value": 262.3848611029656,
+   "dtype": "f16",
+   "n": 4096,
+   "hand": {
+    "fused": {
+     "us": 277.3,
+     "GBps": 242.0
+    }
+   }
+  },
+  "tilematmul_f32_256": {
+   "us": 34.7156,
+   "info": "iters=500 ts_per_us=33.20 wall_per_us=34.72",
+   "err": 6.692287483622885e-07,
+   "ok": true,
+   "tol": 1e-05,
+   "metric": "GFLOPs",
+   "value": 966.5519823940822,
+   "dtype": "f32",
+   "n": 256,
+   "hand": {
+    "fused": {
+     "us": 40.89,
+     "GFLOPs": 820.5
+    }
+   }
+  },
+  "tilematmul_f32_1024": {
+   "us": 1382.7564444444445,
+   "info": "iters=450 ts_per_us=1373.08 wall_per_us=1382.76",
+   "err": 1.2735948625780508e-06,
+   "ok": true,
+   "tol": 1e-05,
+   "metric": "GFLOPs",
+   "value": 1553.045481457006,
+   "dtype": "f32",
+   "n": 1024,
+   "hand": {
+    "fused": {
+     "us": 352.04,
+     "GFLOPs": 6100.1
+    }
+   }
+  },
+  "rt2x2_256": {
+   "us": 25.732,
+   "info": "iters=500 ts_per_us=24.23 wall_per_us=25.73",
+   "err": 6.692287483622885e-07,
+   "ok": true,
+   "tol": 1e-05,
+   "metric": "GFLOPs",
+   "value": 1303.996269236748,
+   "dtype": "f32",
+   "n": 256,
+   "hand": {
+    "fused": {
+     "us": 54.25,
+     "GFLOPs": 618.5
+    }
+   }
+  },
+  "rt4x2_256": {
+   "us": 36.3874,
+   "info": "iters=500 ts_per_us=34.89 wall_per_us=36.39",
+   "err": 6.692287483622885e-07,
+   "ok": true,
+   "tol": 1e-05,
+   "metric": "GFLOPs",
+   "value": 922.144258726922,
+   "dtype": "f32",
+   "n": 256,
+   "hand": {
+    "fused": {
+     "us": 54.25,
+     "GFLOPs": 618.5
+    }
+   }
+  },
+  "rt4x4_256": {
+   "us": 50.1418,
+   "info": "iters=500 ts_per_us=48.43 wall_per_us=50.14",
+   "err": 6.692287483622885e-07,
+   "ok": true,
+   "tol": 1e-05,
+   "metric": "GFLOPs",
+   "value": 669.1908148490879,
+   "dtype": "f32",
+   "n": 256,
+   "hand": {
+    "fused": {
+     "us": 54.25,
+     "GFLOPs": 618.5
+    }
+   }
+  },
+  "rt2x2_1024": {
+   "us": 888.1808000000001,
+   "info": "iters=500 ts_per_us=884.35 wall_per_us=888.18",
+   "err": 1.2735948625780508e-06,
+   "ok": true,
+   "tol": 1e-05,
+   "metric": "GFLOPs",
+   "value": 2417.845159454021,
+   "dtype": "f32",
+   "n": 1024,
+   "hand": {
+    "fused": {
+     "us": 370.04,
+     "GFLOPs": 5803.3
+    }
+   }
+  },
+  "rt4x2_1024": {
+   "us": 731.3756,
+   "info": "iters=500 ts_per_us=728.18 wall_per_us=731.38",
+   "err": 1.2735948625780508e-06,
+   "ok": true,
+   "tol": 1e-05,
+   "metric": "GFLOPs",
+   "value": 2936.225446952291,
+   "dtype": "f32",
+   "n": 1024,
+   "hand": {
+    "fused": {
+     "us": 370.04,
+     "GFLOPs": 5803.3
+    }
+   }
+  },
+  "rt4x4_1024": {
+   "us": 451.2482,
+   "info": "iters=500 ts_per_us=448.38 wall_per_us=451.25",
+   "err": 1.2735948625780508e-06,
+   "ok": true,
+   "tol": 1e-05,
+   "metric": "GFLOPs",
+   "value": 4758.985516174912,
+   "dtype": "f32",
+   "n": 1024,
+   "hand": {
+    "fused": {
+     "us": 370.04,
+     "GFLOPs": 5803.3
+    }
+   }
+  }
+ }
+}
