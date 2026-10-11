@@ -12,7 +12,7 @@ Measured, with the account of how in [docs/what-this-enables.md](docs/what-this-
 
 | Measured | Result |
 |---|---|
-| Kernels from uzu and TensorFold that compile to valid Vulkan programs | 606 of 610 |
+| Kernels from uzu and TensorFold that compile to valid Vulkan programs | 610 of 610 (606 by default, 4 in an opt-in 64-bit mode) |
 | uzu kernels that compile | 121 of 121 |
 | oMLX, mlx-lm, mlx-vlm kernels sampled: compile | 31 of 32 |
 | Same kernels, run on an M1 and checked against a reference | 31 of 31 agree (5 values of about 9,200 differ by 2 to 3 units in the last place in one kernel; about 0.4% of the values in one attention kernel differ by at most 0.02% of their row's largest value) |
@@ -92,7 +92,7 @@ See [docs/how-it-works.md](docs/how-it-works.md) for the details and the reasons
 
 ## Limits
 
-Not every kernel translates. 606 of 610 do today. See [docs/coverage.md](docs/coverage.md) for the rest by cause. The file `sweep/results/FAILURES.md` has the first error of each. One group still fails. It is the kernels that keep a GPU address inside a buffer, a pointer used as runtime data. They need a change to the driver's argument model or to clspv's physical-pointer support.
+Every kernel in the corpus translates: 606 of 610 by default and the last four in an opt-in 64-bit mode. See [docs/coverage.md](docs/coverage.md) for how it got there, by cause. The four are the kimi experts kernels, which read a table of raw GPU addresses. The mode is `M2V_PSB_CASES`. It compiles the named kernels as 64-bit modules with physical storage buffer pointers. Those four are valid SPIR-V only. None has run on a GPU. A host has to pass real device addresses to them, from `vkGetBufferDeviceAddress`.
 
 Translated is not the same as correct. A kernel was checked only if it is in the 31 above. Where Metal leaves the order of floating-point sums or the rounding of `exp` open, results can differ in the last bits.
 
