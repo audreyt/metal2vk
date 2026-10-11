@@ -1,4 +1,3 @@
-import Accelerate
 import Foundation
 import Metal
 
@@ -82,20 +81,20 @@ func dispatch(_ ps: MTLComputePipelineState, _ buffers: [MTLBuffer], _ groupCoun
 func timed(_ ps: MTLComputePipelineState, _ buffers: [MTLBuffer], _ groups: MTLSize, _ threads: MTLSize, _ constants: [(Int, UInt32)] = []) throws -> (Int, Double, Double, Double) {
     let pilot = try dispatch(ps, buffers, groups, threads, constants)
     let iters = max(1, min(500, Int(2_000_000 / max(pilot.1, 1.0))))
-    var cbs: [MTLCommandBuffer] = []; cbs.reserveCapacity(iters)
-    let wall0 = ProcessInfo.processInfo.systemUptime
+    guard let cb = queue.makeCommandBuffer(), let enc = cb.makeComputeCommandEncoder() else { throw NSError(domain: "Metal", code: 1, userInfo: [NSLocalizedDescriptionKey: "FAIL: command buffer allocation"]) }
+    enc.setComputePipelineState(ps)
+    for (i, b) in buffers.enumerated() { enc.setBuffer(b, offset: 0, index: i) }
+    for (index, value) in constants { var x = value; enc.setBytes(&x, length: MemoryLayout<UInt32>.size, index: index) }
     for _ in 0..<iters {
-        guard let cb = queue.makeCommandBuffer(), let enc = cb.makeComputeCommandEncoder() else { throw NSError(domain: "Metal", code: 1, userInfo: [NSLocalizedDescriptionKey: "FAIL: command buffer allocation"]) }
-        enc.setComputePipelineState(ps)
-        for (i, b) in buffers.enumerated() { enc.setBuffer(b, offset: 0, index: i) }
-        for (index, value) in constants { var x = value; enc.setBytes(&x, length: MemoryLayout<UInt32>.size, index: index) }
         enc.dispatchThreadgroups(groups, threadsPerThreadgroup: threads)
-        enc.endEncoding(); cb.commit(); cbs.append(cb)
+        enc.memoryBarrier(scope: .buffers)
     }
-    cbs.last?.waitUntilCompleted()
-    let wall = (ProcessInfo.processInfo.systemUptime - wall0) * 1e6 / Double(iters)
-    guard cbs.allSatisfy({ $0.status == MTLCommandBufferStatus.completed }) else { throw NSError(domain: "Metal", code: 1, userInfo: [NSLocalizedDescriptionKey: "FAIL: timed command buffer failed"]) }
-    let gpu = cbs.reduce(0.0) { $0 + ($1.gpuEndTime - $1.gpuStartTime) * 1e6 } / Double(iters)
+    enc.endEncoding()
+    let start = ProcessInfo.processInfo.systemUptime
+    cb.commit(); cb.waitUntilCompleted()
+    let wall = (ProcessInfo.processInfo.systemUptime - start) * 1e6 / Double(iters)
+    guard cb.status == MTLCommandBufferStatus.completed else { throw NSError(domain: "Metal", code: 1, userInfo: [NSLocalizedDescriptionKey: "FAIL: timed command buffer failed"]) }
+    let gpu = (cb.gpuEndTime - cb.gpuStartTime) * 1e6 / Double(iters)
     let chosen = iters < 50 ? max(gpu, wall) : wall
     return (iters, chosen, gpu, wall)
 }
@@ -155,12 +154,16 @@ func matmul(_ n: Int, _ mr: Int, _ nr: Int, _ ps: MTLComputePipelineState) throw
     let aa = buffer(a), bb = buffer(b), cc = device.makeBuffer(length: n*n*4, options: .storageModeShared)!, dims = buffer([UInt32(n), UInt32(n), UInt32(n)])
     let gx = n / (8 * nr), gy = n / (8 * mr), threads = MTLSize(width: 32, height: 1, depth: 1)
     let tm = try timed(ps, [aa, bb, cc, dims], MTLSize(width: gx, height: gy, depth: 1), threads)
-    var ref = [Float](repeating: 0, count: n*n), got = output(cc, as: Float.self, count: n*n)
-    a.withUnsafeBufferPointer { ap in b.withUnsafeBufferPointer { bp in ref.withUnsafeMutableBufferPointer { rp in
-        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, Int32(n), Int32(n), Int32(n), 1, ap.baseAddress!, Int32(n), bp.baseAddress!, Int32(n), 0, rp.baseAddress!, Int32(n))
-    } } }
+    var ref = [Double](repeating: 0, count: n*n), got = output(cc, as: Float.self, count: n*n)
+    for i in 0..<n {
+        let aoff = i * n
+        for k in 0..<n {
+            let av = Double(a[aoff + k]), boff = k * n
+            for j in 0..<n { ref[aoff + j] += av * Double(b[boff + j]) }
+        }
+    }
     var maxError = 0.0, maxRef = 0.0
-    for i in 0..<(n*n) { maxError = max(maxError, abs(Double(got[i]) - Double(ref[i]))); maxRef = max(maxRef, abs(Double(ref[i]))) }
+    for i in 0..<(n*n) { maxError = max(maxError, abs(Double(got[i]) - ref[i])); maxRef = max(maxRef, abs(ref[i])) }
     maxError /= maxRef + 1e-9
     let name = mr == 1 ? "tilematmul_f32_\(n)" : "rt\(mr)x\(nr)_\(n)"
     let us = tm.1
