@@ -5,8 +5,9 @@ set -u
 : > vlmb/compile-results.txt
 for m in vlmb/*.metal; do
   stem=$(basename "$m" .metal)
-  out=$(ionice -c3 nice -n 19 "$M2V_TOOL" --msl "$m" --out vlmb/out --json 2>&1 | tail -1)
-  status=$(printf '%s' "$out" | sed -n 's/.*"status": *"\([a-z]*\)".*/\1/p')
+  out=$(ionice -c3 nice -n 19 "$M2V_TOOL" --msl "$m" --out vlmb/out --json 2>&1)
+  jsonline=$(printf '%s\n' "$out" | grep -m1 '^{' || true)
+  status=$(printf '%s' "$jsonline" | sed -n 's/.*"status": *"\([a-z][a-z -]*\)".*/\1/p')
   [ -n "$status" ] || status="no-json"
   err=""
   if [ "$status" != "ok" ]; then

@@ -11,7 +11,7 @@ Coverage: 60 assembled kernels across 12 files (one file in our half,
 `mlx_vlm/structured.py`, holds the single kernel KernelBatch already carried as
 `mlx_vlm_llguidance_mask`, so it is not redone here; `mlx_vlm/tests/
 test_models.py` mentions metal_kernel only in prose and has no call sites).
-Results: `../results-vlmb.tsv`.
+Results: `results-vlmb.tsv` (this directory).
 
 ## Commands
 

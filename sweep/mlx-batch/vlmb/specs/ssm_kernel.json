@@ -1,5 +1,5 @@
 {
- "module": "mlx-vlm@8f5dc3d:mlx_vlm/models/ssm.py",
+ "module": "mlx-vlm/mlx_vlm/models/ssm.py",
  "capture": 0,
  "expect_name": "ssm_kernel",
  "origin": "mlx-vlm@8f5dc3d, mlx_vlm/models/ssm.py:56",

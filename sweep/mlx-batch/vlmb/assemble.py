@@ -344,6 +344,8 @@ def main():
     origin = spec["origin"]
     call = spec["call"]
     text = f"// Origin: {origin}.\n// Representative call: {call}.\n{msl}"
+    # repo rule: no em dashes under sweep/mlx-batch; a dash replaces the wide dash so regeneration stays stable
+    text = text.replace("\u2014", " - ")
     out.write_text(text)
     print(json.dumps({"file": out.name, "kernel": kernel_name, "sha256": hashlib.sha256(text.encode()).hexdigest()}))
 
