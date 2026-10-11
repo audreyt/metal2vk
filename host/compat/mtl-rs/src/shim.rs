@@ -853,8 +853,6 @@ pub(crate) fn queue_commit(
         }))
     };
     if !refusals.is_empty() {
-        let names: Vec<&str> = refusals.iter().map(|(k, _)| k.as_str()).collect();
-        let details: Vec<String> = refusals.iter().map(|(k, r)| format!("  {k}: {r}")).collect();
         let message = pipeline_refusal_message_from(&refusals);
         if let Some(on_complete) = on_complete {
             on_complete(metal2vk::Completion {

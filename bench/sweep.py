@@ -49,6 +49,8 @@ def main():
     ap.add_argument("outdir")
     ap.add_argument("--spvroot", default=None)
     ap.add_argument("--runner", default=os.environ.get("M2V_RUNNER", "m2v-run"))
+    ap.add_argument("--device", default=None, help="output tag + ICD env override, as for m2v-bench.py")
+    ap.add_argument("--icd", default=None, help="VK_DRIVER_FILES value (overrides devices.json), as for m2v-bench.py")
     args = ap.parse_args()
     os.makedirs(args.outdir, exist_ok=True)
     spvroot = args.spvroot or os.path.join(args.outdir, "spv-sweep")
@@ -56,7 +58,7 @@ def main():
     if not env.get("UZU_ROOT"):
         sys.exit("sweep: set UZU_ROOT")
 
-    tag, devname, drv = b.device_info()
+    tag, devname, drv, _ = b.select_device(args.device, args.icd)
     date = datetime.date.today().isoformat()
     # receipts carry device name, driver string and relative paths only (no host names or home paths)
     report = {"device": tag, "device_name": devname, "driver": drv, "date": date, "kernels": {}}

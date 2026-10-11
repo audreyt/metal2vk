@@ -65,6 +65,21 @@ def load_device_map():
         return {}
 
 
+def select_device(device=None, icd=None):
+    """(tag, deviceName, driverInfo, icd) for `--device` and `--icd`. An explicit ICD (`--icd`, M2V_ICD) always sets
+    VK_DRIVER_FILES. The ICD that devices.json lists for the tag is used only when the environment has none: a
+    preconfigured VK_DRIVER_FILES wins over devices.json."""
+    if device:
+        tag, devname, drv = device.lower(), None, ""
+    else:
+        tag, devname, drv = device_info()
+    listed = load_device_map().get(tag, {}).get("icd")
+    chosen = icd or os.environ.get("M2V_ICD") or listed or os.environ.get("VK_DRIVER_FILES")
+    if icd or os.environ.get("M2V_ICD") or (listed and not os.environ.get("VK_DRIVER_FILES")):
+        os.environ["VK_DRIVER_FILES"] = chosen
+    return tag, devname, drv, chosen
+
+
 def run_once(runner, spv, entry, grid, bufs, push, local, iters, dump=None):
     cmd = [runner, spv, entry, *map(str, grid), "--iters", str(iters),
            "--local", *map(str, local)]
@@ -271,14 +286,7 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
     want = set(args.cases.split(","))
 
-    tag, devname, drv = (args.device or device_info()[0]).lower(), None, ""
-    if not args.device:
-        tag, devname, drv = device_info()
-    dm = load_device_map().get(tag, {})
-    icd = args.icd or os.environ.get("M2V_ICD") or dm.get("icd") or os.environ.get("VK_DRIVER_FILES")
-    # the tag switch only changes the output tag and the ICD env (M2V_ICD / --icd / devices.json)
-    if args.icd or os.environ.get("M2V_ICD") or (dm.get("icd") and not os.environ.get("VK_DRIVER_FILES")):
-        os.environ["VK_DRIVER_FILES"] = icd
+    tag, devname, drv, icd = select_device(args.device, args.icd)
 
     date = datetime.date.today().isoformat()
     # receipts carry device name, driver string and relative paths only (no host names or home paths)

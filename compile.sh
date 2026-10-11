@@ -28,6 +28,8 @@ CASES=${*:-activation softmax tilematmul tilematmul_rt gemm}
 mkdir -p "$OUT"
 for c in $CASES; do
   echo "== $c"
+  # a failed compile must not leave the previous run's module for a later step to pick up
+  rm -f -- "$OUT/$c.ll" "$OUT/$c.spv" "$OUT/$c.json"
   # physical-storage-buffer mode (opt-in): M2V_PSB_CASES is a list of case-name substrings; a matching case is
   # compiled as a 64-bit module (clang --target=spir64, clspv --arch=spir64 --physical-storage-buffers), which is
   # the only way to express a buffer of raw device addresses (Metal `device const ExpertPtrs* table`). Every other
