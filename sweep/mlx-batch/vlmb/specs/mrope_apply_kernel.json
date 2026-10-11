@@ -1,0 +1,46 @@
+{
+ "module": "mlx-vlm/mlx_vlm/models/rope_utils.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/models/rope_utils.py:647",
+ "call": "x (1,2,4,32) float32, position_ids (1,4) int32, inv_freq (16) float32, position_selector (16) int32; T=float32, rotary_dim=32, position_ndim=2, half_split; grid=(128,1,1), threadgroup=(256,1,1); x_out (1,2,4,32)",
+ "inputs": [
+  {
+   "name": "x",
+   "dtype": "float32",
+   "ndim": 4,
+   "size": 256
+  },
+  {
+   "name": "position_ids",
+   "dtype": "int32",
+   "ndim": 2,
+   "size": 4
+  },
+  {
+   "name": "inv_freq",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 16
+  },
+  {
+   "name": "position_selector",
+   "dtype": "int32",
+   "ndim": 1,
+   "size": 16
+  }
+ ],
+ "outputs": [
+  "float32"
+ ],
+ "template": [
+  [
+   "T",
+   "float32"
+  ]
+ ],
+ "factory": "_mrope_apply_kernel",
+ "args": [
+  32,
+  2,
+  "half_split"
+ ]
+}

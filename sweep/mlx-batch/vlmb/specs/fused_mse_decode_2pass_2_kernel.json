@@ -1,0 +1,40 @@
+{
+ "module": "mlx-vlm/mlx_vlm/turboquant.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/turboquant.py:2617",
+ "call": "fused mse sdpa two-pass 2: out_acc (128,64) float32, out_sums/out_maxs (128) float32; Dim=64,Blocks=64; grid=(2048,1,1), threadgroup=(1024,1,1); out (2,64) float32",
+ "inputs": [
+  {
+   "name": "partials",
+   "dtype": "float32",
+   "ndim": 2,
+   "size": 8192
+  },
+  {
+   "name": "sums",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 128
+  },
+  {
+   "name": "maxs",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 128
+  }
+ ],
+ "outputs": [
+  "float32"
+ ],
+ "template": [
+  [
+   "Dim",
+   64
+  ],
+  [
+   "Blocks",
+   64
+  ]
+ ],
+ "factory": "_fused_mse_decode_2pass_2_kernel",
+ "args": []
+}

@@ -1,0 +1,116 @@
+{
+ "module": "mlx-vlm/mlx_vlm/turboquant.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/turboquant.py:2209",
+ "call": "fully fused: as fused integer decode plus rot_input (64,64) float32; Dim=64,RepeatCount=1,DimsPerLane=2,KMsePackedWidth=8,KSignPackedWidth=2,VPackedWidth=8; grid=(32,1,1), threadgroup=(32,1,1); out (1,1,1,64) float32",
+ "inputs": [
+  {
+   "name": "q_rot",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 64
+  },
+  {
+   "name": "q_proj",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 64
+  },
+  {
+   "name": "key_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "key_mse",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 16
+  },
+  {
+   "name": "key_res_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "key_signs",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 4
+  },
+  {
+   "name": "val_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "val_packed",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 16
+  },
+  {
+   "name": "key_codebook",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 16
+  },
+  {
+   "name": "key_scale",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 1
+  },
+  {
+   "name": "val_codebook",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 16
+  },
+  {
+   "name": "rot_input",
+   "dtype": "float32",
+   "ndim": 2,
+   "size": 4096
+  }
+ ],
+ "outputs": [
+  "float32"
+ ],
+ "template": [
+  [
+   "Dim",
+   64
+  ],
+  [
+   "RepeatCount",
+   1
+  ],
+  [
+   "DimsPerLane",
+   2
+  ],
+  [
+   "KMsePackedWidth",
+   8
+  ],
+  [
+   "KSignPackedWidth",
+   2
+  ],
+  [
+   "VPackedWidth",
+   8
+  ]
+ ],
+ "factory": "_fully_fused_decode_kernel",
+ "args": [
+  4,
+  1,
+  2,
+  4,
+  false
+ ]
+}

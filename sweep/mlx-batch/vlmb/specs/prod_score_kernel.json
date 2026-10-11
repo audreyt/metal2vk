@@ -1,0 +1,78 @@
+{
+ "module": "mlx-vlm/mlx_vlm/turboquant.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/turboquant.py:356",
+ "call": "q_rot/q_proj (1,1,1,64) float16, norms/residual_norms (1,1,2) float16, mse_packed (1,1,2,8) uint32, signs (1,1,2,2) uint32, codebook (16) float32, scale (1) float32; Dim=64,MseBits=4,MsePackedWidth=8,SignPackedWidth=2; grid=(32,1,2), threadgroup=(32,1,1); out (1,1,1,2) float32",
+ "inputs": [
+  {
+   "name": "q_rot",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 64
+  },
+  {
+   "name": "q_proj",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 64
+  },
+  {
+   "name": "norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "residual_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "mse_packed",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 16
+  },
+  {
+   "name": "signs",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 4
+  },
+  {
+   "name": "codebook",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 16
+  },
+  {
+   "name": "scale",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 1
+  }
+ ],
+ "outputs": [
+  "float32"
+ ],
+ "template": [
+  [
+   "Dim",
+   64
+  ],
+  [
+   "MseBits",
+   4
+  ],
+  [
+   "MsePackedWidth",
+   8
+  ],
+  [
+   "SignPackedWidth",
+   2
+  ]
+ ],
+ "factory": "_prod_score_kernel",
+ "args": []
+}

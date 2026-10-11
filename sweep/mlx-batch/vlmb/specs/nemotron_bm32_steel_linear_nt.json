@@ -1,0 +1,38 @@
+{
+ "module": "mlx-vlm/mlx_vlm/models/nemotron_labs_diffusion/language.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/models/nemotron_labs_diffusion/language.py:56",
+ "call": "x (32,64) bfloat16, weight (128,64) bfloat16; T=bfloat16,K=64,O=128; grid=(256,1,1), threadgroup=(128,1,1); out (32,128)",
+ "inputs": [
+  {
+   "name": "x",
+   "dtype": "bfloat16",
+   "ndim": 2,
+   "size": 2048
+  },
+  {
+   "name": "weight",
+   "dtype": "bfloat16",
+   "ndim": 2,
+   "size": 8192
+  }
+ ],
+ "outputs": [
+  "bfloat16"
+ ],
+ "template": [
+  [
+   "T",
+   "bfloat16"
+  ],
+  [
+   "K",
+   64
+  ],
+  [
+   "O",
+   128
+  ]
+ ],
+ "capture": 0,
+ "expect_name": "nemotron_bm32_steel_linear_nt"
+}

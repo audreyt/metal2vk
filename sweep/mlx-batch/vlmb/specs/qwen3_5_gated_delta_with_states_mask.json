@@ -1,0 +1,92 @@
+{
+ "module": "mlx-vlm/mlx_vlm/models/qwen3_5/gated_delta.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/models/qwen3_5/gated_delta.py:540",
+ "call": "q/k/v float32 (1,2,1,32), g (1,2,1) float32, beta (1,2,1), state (1,1,32,32) float32, T scalar int32, mask (1,2) bool; InT=StT=float32,Dk=Dv=32,Hk=Hv=1,StateT=2; grid=(32,32,1), threadgroup=(32,4,1); y (1,2,1,32), state_out (1,1,32,32), states (1,2,1,32,32)",
+ "inputs": [
+  {
+   "name": "q",
+   "dtype": "float32",
+   "ndim": 4,
+   "size": 64
+  },
+  {
+   "name": "k",
+   "dtype": "float32",
+   "ndim": 4,
+   "size": 64
+  },
+  {
+   "name": "v",
+   "dtype": "float32",
+   "ndim": 4,
+   "size": 64
+  },
+  {
+   "name": "g",
+   "dtype": "float32",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "beta",
+   "dtype": "float32",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "state_in",
+   "dtype": "float32",
+   "ndim": 4,
+   "size": 1024
+  },
+  {
+   "name": "T",
+   "dtype": "int32",
+   "ndim": 0,
+   "size": 1
+  },
+  {
+   "name": "mask",
+   "dtype": "bool",
+   "ndim": 2,
+   "size": 2
+  }
+ ],
+ "outputs": [
+  "float32",
+  "float32",
+  "float32"
+ ],
+ "template": [
+  [
+   "InT",
+   "float32"
+  ],
+  [
+   "StT",
+   "float32"
+  ],
+  [
+   "Dk",
+   32
+  ],
+  [
+   "Dv",
+   32
+  ],
+  [
+   "Hk",
+   1
+  ],
+  [
+   "Hv",
+   1
+  ],
+  [
+   "StateT",
+   2
+  ]
+ ],
+ "capture": 5,
+ "expect_name": "qwen3_5_gated_delta_with_states_mask"
+}

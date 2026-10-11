@@ -1,0 +1,61 @@
+{
+ "module": "mlx-vlm/mlx_vlm/models/quantized_verifier.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/models/quantized_verifier.py:1506",
+ "call": "token-tiled: x (1,6,512) float16; VERIFY_T=6; grid=(32,16,3), threadgroup=(32,2,1); y (1,6,64)",
+ "inputs": [
+  {
+   "name": "x",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 3072
+  },
+  {
+   "name": "w",
+   "dtype": "uint32",
+   "ndim": 2,
+   "size": 4096
+  },
+  {
+   "name": "scales",
+   "dtype": "float16",
+   "ndim": 2,
+   "size": 512
+  },
+  {
+   "name": "biases",
+   "dtype": "float16",
+   "ndim": 2,
+   "size": 512
+  }
+ ],
+ "outputs": [
+  "float16"
+ ],
+ "template": [
+  [
+   "T",
+   "float16"
+  ],
+  [
+   "VERIFY_T",
+   6
+  ],
+  [
+   "K_SIZE",
+   512
+  ],
+  [
+   "N_SIZE",
+   64
+  ]
+ ],
+ "factory": "_target_verify_qmv_token_tiled_kernel",
+ "args": [
+  4,
+  64,
+  "float16",
+  6,
+  512,
+  64
+ ]
+}

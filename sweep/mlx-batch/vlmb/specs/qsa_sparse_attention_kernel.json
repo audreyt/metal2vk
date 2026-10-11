@@ -1,0 +1,100 @@
+{
+ "module": "mlx-vlm/mlx_vlm/models/qwen4_exp/qsa_kernel.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/models/qwen4_exp/qsa_kernel.py:180",
+ "call": "queries/keys/values (1,2,4,64)/(1,1,8,64)/(1,1,8,64) float16, block_indices (1,4,1) int32, query_ends (1,4) int32, scale (1) float32, k_size (1) int32; T=float16,D_SIZE=64,Q_LEN=4,NUM_Q_HEADS=2,NUM_KV_HEADS=1,GQA_FACTOR=2,BLOCK_SIZE=8,TOPK_BLOCKS=1,SELECTED_LENGTH=8; grid=(1024,8,1), threadgroup=(1024,1,1); out (1,2,4,64)",
+ "inputs": [
+  {
+   "name": "queries",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 512
+  },
+  {
+   "name": "keys",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 512
+  },
+  {
+   "name": "values",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 512
+  },
+  {
+   "name": "block_indices",
+   "dtype": "int32",
+   "ndim": 3,
+   "size": 4
+  },
+  {
+   "name": "query_ends",
+   "dtype": "int32",
+   "ndim": 2,
+   "size": 4
+  },
+  {
+   "name": "scale",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 1
+  },
+  {
+   "name": "k_size",
+   "dtype": "int32",
+   "ndim": 1,
+   "size": 1
+  }
+ ],
+ "outputs": [
+  "float16"
+ ],
+ "template": [
+  [
+   "T",
+   "float16"
+  ],
+  [
+   "D_SIZE",
+   64
+  ],
+  [
+   "Q_LEN",
+   4
+  ],
+  [
+   "NUM_Q_HEADS",
+   2
+  ],
+  [
+   "NUM_KV_HEADS",
+   1
+  ],
+  [
+   "GQA_FACTOR",
+   2
+  ],
+  [
+   "BLOCK_SIZE",
+   8
+  ],
+  [
+   "TOPK_BLOCKS",
+   1
+  ],
+  [
+   "SELECTED_LENGTH",
+   8
+  ]
+ ],
+ "factory": "_qsa_sparse_attention_kernel",
+ "args": [
+  "float16",
+  64,
+  8,
+  8,
+  1,
+  2,
+  1
+ ]
+}

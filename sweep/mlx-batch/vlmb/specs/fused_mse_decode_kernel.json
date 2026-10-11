@@ -1,0 +1,76 @@
+{
+ "module": "mlx-vlm/mlx_vlm/turboquant.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/turboquant.py:2421",
+ "call": "fused mse sdpa single pass: q_rot_flat (2,64) float16, key/val norms (1,1,2) float16, key/val packed (1,1,2,8) uint32, codebooks (16) float32; Dim=64,RepeatCount=2,KPackedWidth=8,VPackedWidth=8; grid=(2048,1,1), threadgroup=(1024,1,1); out (2,64) float32",
+ "inputs": [
+  {
+   "name": "q_rot_flat",
+   "dtype": "float16",
+   "ndim": 2,
+   "size": 128
+  },
+  {
+   "name": "key_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "key_packed",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 16
+  },
+  {
+   "name": "key_codebook",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 16
+  },
+  {
+   "name": "val_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "val_packed",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 16
+  },
+  {
+   "name": "val_codebook",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 16
+  }
+ ],
+ "outputs": [
+  "float32"
+ ],
+ "template": [
+  [
+   "Dim",
+   64
+  ],
+  [
+   "RepeatCount",
+   2
+  ],
+  [
+   "KPackedWidth",
+   8
+  ],
+  [
+   "VPackedWidth",
+   8
+  ]
+ ],
+ "factory": "_fused_mse_decode_kernel",
+ "args": [
+  4,
+  4,
+  64
+ ]
+}

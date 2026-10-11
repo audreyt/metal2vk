@@ -1,0 +1,78 @@
+{
+ "module": "mlx-vlm/mlx_vlm/models/qwen3_5/language.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/models/qwen3_5/language.py:570",
+ "call": "decode: queries (1,2,1,64) float16, keys/values (1,1,8,64), pads (1) int32, scale (1) float32, k_size (1) int32; T=float16,D_SIZE=64,V_SIZE=64,NUM_Q_HEADS=2,NUM_KV_HEADS=1,GQA_FACTOR=2; grid=(1024,2,1), threadgroup=(1024,1,1); out (1,2,1,64)",
+ "inputs": [
+  {
+   "name": "queries",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 128
+  },
+  {
+   "name": "keys",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 512
+  },
+  {
+   "name": "values",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 512
+  },
+  {
+   "name": "pads",
+   "dtype": "int32",
+   "ndim": 1,
+   "size": 1
+  },
+  {
+   "name": "scale",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 1
+  },
+  {
+   "name": "k_size",
+   "dtype": "int32",
+   "ndim": 1,
+   "size": 1
+  }
+ ],
+ "outputs": [
+  "float16"
+ ],
+ "template": [
+  [
+   "T",
+   "float16"
+  ],
+  [
+   "D_SIZE",
+   64
+  ],
+  [
+   "V_SIZE",
+   64
+  ],
+  [
+   "NUM_Q_HEADS",
+   2
+  ],
+  [
+   "NUM_KV_HEADS",
+   1
+  ],
+  [
+   "GQA_FACTOR",
+   2
+  ]
+ ],
+ "factory": "_qwen3_5_ragged_sdpa_one_pass_kernel",
+ "args": [
+  "float16",
+  64,
+  64
+ ]
+}

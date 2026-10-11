@@ -1,0 +1,80 @@
+{
+ "module": "mlx-vlm/mlx_vlm/models/quantized_verifier.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/models/quantized_verifier.py:604",
+ "call": "MoE+HC epilogue: routed (1,2,2,64) float16, route_weights (1,2,2) float32, shared (1,2,64) float16, residual (1,2,2,64) float16, post/comb (1,2,2) float32; T=float16,ROWS=2,HC=2,D=64,SIMDS=8,TOP_K=2; grid=(64,8,1), threadgroup=(32,8,1); out (1,2,2,64)",
+ "inputs": [
+  {
+   "name": "routed",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 256
+  },
+  {
+   "name": "route_weights",
+   "dtype": "float32",
+   "ndim": 3,
+   "size": 4
+  },
+  {
+   "name": "shared",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 128
+  },
+  {
+   "name": "residual",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 256
+  },
+  {
+   "name": "post",
+   "dtype": "float32",
+   "ndim": 3,
+   "size": 4
+  },
+  {
+   "name": "comb",
+   "dtype": "float32",
+   "ndim": 3,
+   "size": 4
+  }
+ ],
+ "outputs": [
+  "float16"
+ ],
+ "template": [
+  [
+   "T",
+   "float16"
+  ],
+  [
+   "ROWS",
+   2
+  ],
+  [
+   "HC",
+   2
+  ],
+  [
+   "D",
+   64
+  ],
+  [
+   "SIMDS",
+   8
+  ],
+  [
+   "TOP_K",
+   2
+  ]
+ ],
+ "factory": "_quantized_moe_hc_kernel",
+ "args": [
+  "float16",
+  2,
+  2,
+  64,
+  2
+ ]
+}

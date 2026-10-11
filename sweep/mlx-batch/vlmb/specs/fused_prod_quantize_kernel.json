@@ -1,0 +1,66 @@
+{
+ "module": "mlx-vlm/mlx_vlm/turboquant.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/turboquant.py:3122",
+ "call": "fused prod quantize: flat (1,64) float16, rotation (64,64) float32, midpoints (15) float32, codebook (16) float32, combined proj (64,64) float32; Dim=64,DimsPerLane=2,MsePackedWidth=8,SignPackedWidth=2; grid=(32,1,1), threadgroup=(32,1,1); out norms/res_norms (1) float16, mse_packed (1,8) uint32, signs (1,2) uint32",
+ "inputs": [
+  {
+   "name": "flat",
+   "dtype": "float16",
+   "ndim": 2,
+   "size": 64
+  },
+  {
+   "name": "rot_input",
+   "dtype": "float32",
+   "ndim": 2,
+   "size": 4096
+  },
+  {
+   "name": "midpoints",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 15
+  },
+  {
+   "name": "codebook",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 16
+  },
+  {
+   "name": "combined_proj_t",
+   "dtype": "float32",
+   "ndim": 2,
+   "size": 4096
+  }
+ ],
+ "outputs": [
+  "float16",
+  "uint32",
+  "float16",
+  "uint32"
+ ],
+ "template": [
+  [
+   "Dim",
+   64
+  ],
+  [
+   "DimsPerLane",
+   2
+  ],
+  [
+   "MsePackedWidth",
+   8
+  ],
+  [
+   "SignPackedWidth",
+   2
+  ]
+ ],
+ "factory": "_fused_prod_quantize_kernel",
+ "args": [
+  4,
+  false
+ ]
+}

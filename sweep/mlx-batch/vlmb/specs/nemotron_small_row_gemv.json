@@ -1,0 +1,42 @@
+{
+ "module": "mlx-vlm/mlx_vlm/models/nemotron_labs_diffusion/language.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/models/nemotron_labs_diffusion/language.py:203",
+ "call": "x (8,64) float16, weight (64,64) float16; T=float16,K=64,O=64,R=8; grid=(32,16,8), threadgroup=(32,1,8); out (8,64)",
+ "inputs": [
+  {
+   "name": "x",
+   "dtype": "float16",
+   "ndim": 2,
+   "size": 512
+  },
+  {
+   "name": "weight",
+   "dtype": "float16",
+   "ndim": 2,
+   "size": 4096
+  }
+ ],
+ "outputs": [
+  "float16"
+ ],
+ "template": [
+  [
+   "T",
+   "float16"
+  ],
+  [
+   "K",
+   64
+  ],
+  [
+   "O",
+   64
+  ],
+  [
+   "R",
+   8
+  ]
+ ],
+ "capture": 1,
+ "expect_name": "nemotron_small_row_gemv"
+}
