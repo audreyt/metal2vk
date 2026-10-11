@@ -121,7 +121,7 @@ func activation(_ type: String, _ ps: MTLComputePipelineState) throws -> Row {
         for i in 0..<nActivation { let ref = Double(x[i]) / (1.0 + exp(-Double(x[i]))); maxError = max(maxError, abs(Double(got[i]) - ref) / (1.0 + abs(ref))) }
     } else {
         let got = output(result, as: Float16.self, count: nActivation)
-        for i in 0..<nActivation { let ref = Double(x[i]) / (1.0 + exp(-Double(x[i]))); maxError = max(maxError, abs(Double(got[i]) - ref) / (1.0 + abs(ref))) }
+        for i in 0..<nActivation { let q = Double(Float16(x[i])); let ref = q / (1.0 + exp(-q)); maxError = max(maxError, abs(Double(got[i]) - ref) / (1.0 + abs(ref))) }
     }
     let us = timedResult.1
     return Row(name: "activation_\(type)", timeUS: us, gpuUS: timedResult.2, wallUS: timedResult.3, iterations: timedResult.0, error: maxError, tolerance: tolValue, metric: "GBps", value: Double(2 * nActivation * (type == "f32" ? 4 : 2)) / (us * 1e3))
@@ -145,7 +145,7 @@ func softmax(_ type: String, _ ps: MTLComputePipelineState) throws -> Row {
         for row in 0..<nSoftmax { let base = row * nSoftmax; let maxv = original[base..<(base+nSoftmax)].map { Double($0) }.max()!; let sum = original[base..<(base+nSoftmax)].reduce(0.0) { $0 + exp(Double($1) - maxv) }; for col in 0..<nSoftmax { maxError = max(maxError, abs(Double(got[base+col]) - exp(Double(original[base+col]) - maxv) / sum)) } }
     } else {
         let got = output(result, as: Float16.self, count: nSoftmax * nSoftmax)
-        for row in 0..<nSoftmax { let base = row * nSoftmax; let maxv = original[base..<(base+nSoftmax)].map { Double($0) }.max()!; let sum = original[base..<(base+nSoftmax)].reduce(0.0) { $0 + exp(Double($1) - maxv) }; for col in 0..<nSoftmax { maxError = max(maxError, abs(Double(got[base+col]) - exp(Double(original[base+col]) - maxv) / sum)) } }
+        for row in 0..<nSoftmax { let base = row * nSoftmax; let q = original[base..<(base+nSoftmax)].map { Double(Float16($0)) }; let maxv = q.max()!; let sum = q.reduce(0.0) { $0 + exp($1 - maxv) }; for col in 0..<nSoftmax { maxError = max(maxError, abs(Double(got[base+col]) - exp(q[col] - maxv) / sum)) } }
     }
     let us = timedResult.1
     return Row(name: "softmax_\(type)", timeUS: us, gpuUS: timedResult.2, wallUS: timedResult.3, iterations: timedResult.0, error: maxError, tolerance: tolValue, metric: "GBps", value: Double(2 * nSoftmax * nSoftmax * (type == "f32" ? 4 : 2)) / (us * 1e3))
