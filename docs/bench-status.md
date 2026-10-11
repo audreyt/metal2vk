@@ -77,20 +77,20 @@ comes from the two run files `bench/results-g14c-2026-10-11-run1.json` and
 `bench/results-g14c-2026-10-11-run2.json`. Five of the kernel groups are also
 in the body of pull request 70. Every correctness check was OK.
 
-| kernel | run 1 translated / MLX | run 2 translated / MLX | translated throughput, run 1 / run 2 | spread |
+| kernel | run 1 translated / MLX (us) | run 2 translated / MLX (us) | translated throughput, run 1 / run 2 | spread (us, %) |
 | --- | --- | --- | --- | --- |
-| activation f32, 8M | 282.0 / 637.4 us | 287.6 / 637.3 us | 237.9 / 233.3 GB/s | 5.6 us (2.0%) |
-| activation f16, 8M | 268.5 / 133.8 us | 275.9 / 136.1 us | 125.0 / 121.6 GB/s | 7.3 us (2.7%) |
-| softmax f32, 4096² | 459.5 / 613.5 us | 465.0 / 614.5 us | 292.1 / 288.6 GB/s | 5.6 us (1.2%) |
-| softmax f16, 4096² | 253.3 / 277.8 us | 255.8 / 277.3 us | 264.9 / 262.4 GB/s | 2.4 us (1.0%) |
-| tilematmul f32, 256³ | 30.0 / 41.0 us | 34.7 / 40.9 us | 1119.4 / 966.6 GFLOP/s | 4.7 us (15.8%) |
-| tilematmul f32, 1024³ | 1383.5 / 351.4 us | 1382.8 / 352.0 us | 1552.2 / 1553.0 GFLOP/s | 0.8 us (0.1%) |
-| rt2x2, 256³ | 25.9 / 41.1 us | 25.7 / 54.2 us | 1295.7 / 1304.0 GFLOP/s | 0.2 us (0.6%) |
-| rt4x2, 256³ | 36.4 / 41.1 us | 36.4 / 54.2 us | 922.4 / 922.1 GFLOP/s | 0.0 us (0.0%) |
-| rt4x4, 256³ | 50.4 / 41.1 us | 50.1 / 54.2 us | 666.3 / 669.2 GFLOP/s | 0.2 us (0.4%) |
-| rt2x2, 1024³ | 885.6 / 351.5 us | 888.2 / 370.0 us | 2424.9 / 2417.8 GFLOP/s | 2.6 us (0.3%) |
-| rt4x2, 1024³ | 730.1 / 351.5 us | 731.4 / 370.0 us | 2941.2 / 2936.2 GFLOP/s | 1.2 us (0.2%) |
-| rt4x4, 1024³ | 450.6 / 351.5 us | 451.2 / 370.0 us | 4766.0 / 4759.0 GFLOP/s | 0.7 us (0.1%) |
+| activation f32, 8M | 282.0 / 637.4 | 287.6 / 637.3 | 237.9 / 233.3 GB/s | 5.6 (2.0%) |
+| activation f16, 8M | 268.5 / 133.8 | 275.9 / 136.1 | 125.0 / 121.6 GB/s | 7.3 (2.7%) |
+| softmax f32, 4096² | 459.5 / 613.5 | 465.0 / 614.5 | 292.1 / 288.6 GB/s | 5.6 (1.2%) |
+| softmax f16, 4096² | 253.3 / 277.8 | 255.8 / 277.3 | 264.9 / 262.4 GB/s | 2.4 (1.0%) |
+| tilematmul f32, 256³ | 30.0 / 41.0 | 34.7 / 40.9 | 1119.4 / 966.6 GFLOP/s | 4.7 (15.8%) |
+| tilematmul f32, 1024³ | 1383.5 / 351.4 | 1382.8 / 352.0 | 1552.2 / 1553.0 GFLOP/s | 0.8 (0.1%) |
+| rt2x2, 256³ | 25.9 / 41.1 | 25.7 / 54.2 | 1295.7 / 1304.0 GFLOP/s | 0.2 (0.6%) |
+| rt4x2, 256³ | 36.4 / 41.1 | 36.4 / 54.2 | 922.4 / 922.1 GFLOP/s | 0.0 (0.0%) |
+| rt4x4, 256³ | 50.4 / 41.1 | 50.1 / 54.2 | 666.3 / 669.2 GFLOP/s | 0.2 (0.4%) |
+| rt2x2, 1024³ | 885.6 / 351.5 | 888.2 / 370.0 | 2424.9 / 2417.8 GFLOP/s | 2.6 (0.3%) |
+| rt4x2, 1024³ | 730.1 / 351.5 | 731.4 / 370.0 | 2941.2 / 2936.2 GFLOP/s | 1.2 (0.2%) |
+| rt4x4, 1024³ | 450.6 / 351.5 | 451.2 / 370.0 | 4766.0 / 4759.0 GFLOP/s | 0.7 (0.1%) |
 
 Spread is the difference in translated time between runs.
 
