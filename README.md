@@ -19,6 +19,7 @@ Measured, with the account of how in [docs/what-this-enables.md](docs/what-this-
 | Refused | 1 kernel needs the M5 chip's tensor operations |
 | Simple tiled matrix multiply, M1 Max | 4.27 TFLOP/s (hand-tuned Vulkan: 4.07) |
 | uzu tiled matrix multiply, M1 Max | about 0.3 times the hand-tuned kernel |
+| Translated kernels against MLX's own kernels on the same GPU, M2 Max, two runs (Mesa git 6543eeb7df7, load 1.30 at the start) | softmax f32 takes 0.75 and 0.76 of the MLX time, softmax f16 0.91 and 0.92. The 4x4 register-tiled matrix multiply, 1024³, takes 1.28 and 1.22 times the MLX time (4.77 and 4.76 TFLOP/s against 6.11 and 5.80). The SiLU kernel takes 0.44 and 0.45 of the unfused MLX time in f32 and 2.0 times the fused MLX time in f16. The runs differ by 1.2% or less on softmax and by 5% on the MLX matmul time |
 | Compile time per kernel | 1.8 s first time, 0.8 s cached |
 | Whole-model speed through this route | not measured yet |
 
@@ -102,7 +103,7 @@ Newest-chip features need care. One sampled kernel uses a Metal feature that onl
 
 Cooperative matrix needs a driver that offers it. Stock Mesa Honeykrisp does not yet. The [omarchy-mlx](https://github.com/joshuaswarren/omarchy-mlx) fork does.
 
-There is no whole-model speed number yet. Kernel speed is measured. Tokens per second through this route is not.
+There is no whole-model speed number yet. Kernel speed is measured against MLX's own kernels on the same GPU. It has not been measured against native Metal. That needs the same kernel timed under macOS on the same chip. Tokens per second through this route is not measured.
 
 ## Status and roadmap
 
