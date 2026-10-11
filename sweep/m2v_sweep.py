@@ -53,6 +53,15 @@ CLSPV = os.environ.get("CLSPV", str(pathlib.Path.home() / "scratch/metal2vk/clsp
 SPIRV_VAL = os.environ.get("SPIRV_VAL", "spirv-val")
 CLSPV_TIMEOUT = int(os.environ.get("M2V_CLSPV_TIMEOUT", "90"))  # seconds per module; a loaded build host needs more
 M2V_DEFS = os.environ.get("M2V_DEFS", "").split()
+# Physical-storage-buffer mode, opt-in per case: entries whose tag contains one of these substrings are compiled as
+# 64-bit modules (clang --target=spir64, clspv --arch=spir64 --physical-storage-buffers). That is the only way to
+# express a buffer of raw device addresses (Metal `device const ExpertPtrs* table`, the kimi/experts kernels). Every
+# other entry keeps the 32-bit module, byte for byte. Empty by default.
+PSB_CASES = os.environ.get("M2V_PSB_CASES", "").split()
+
+
+def psb_case(tag):
+    return any(p and p in tag for p in PSB_CASES)
 OPT = os.environ.get("OPT", "opt")  # the LLVM opt of the same version as CLANG
 # Front-end optimisation flags. The default is compile.sh's typed-GEP route: clang -O0 without optnone, then LLVM's inliner and SROA (no
 # InstCombine, which rewrites typed GEPs into byte offsets that clspv's pointer passes cannot follow). M2V_OPT overrides it, e.g. the old
@@ -1571,7 +1580,7 @@ def process_once(setname, src_path, rel, eidx, kname, targs, outdir, include_dir
         uzu_compat(norm_decls(strip_annotate(src))))))) + '\n#line 1 "m2v-wrapper"\n' + wsrc)
     ll = d / "ll" / (tag + ".ll")
     ll.parent.mkdir(parents=True, exist_ok=True)
-    cmd = [CLANG, "--target=spir", "-x", "cl", "-cl-std=clc++2021", "-Xclang", "-finclude-default-header",
+    cmd = [CLANG, "--target=" + ("spir64" if psb_case(tag) else "spir"), "-x", "cl", "-cl-std=clc++2021", "-Xclang", "-finclude-default-header",
            "-cl-ext=-__opencl_c_generic_address_space", *(fe_opt if fe_opt is not None else FE_OPT), "-fno-strict-return", "-cl-kernel-arg-info", "-w", "-ferror-limit=100",
            *M2V_DEFS, *defs, f"-I{INC}", *[f"-I{x}" for x in include_dirs], "-S", "-emit-llvm", str(cl), "-o", str(ll)]
     rc, out, _ = sh(cmd)
@@ -1643,13 +1652,40 @@ def process_once(setname, src_path, rel, eidx, kname, targs, outdir, include_dir
     # clspv's intrinsics pass; expand those to byte load/stores first (no-op otherwise)
     m1 = re.search(r"@llvm\.memcpy\.[\w.]*?p(\d+)[\w.]*?\.p(\d+)", txt)
     if m1 and m1.group(1) != m1.group(2):
-        rc, out, _ = sh([sys.executable, str(HERE / "memcpy_mixed_as.py"), str(ll)])
+        mcp_cmd = [sys.executable, str(HERE / "memcpy_mixed_as.py")]
+        if psb_case(tag):
+            mcp_cmd.append("--ptr-copies")
+        mcp_cmd.append(str(ll))
+        rc, out, _ = sh(mcp_cmd)
         if rc != 0:
             row["ir"] = "FAIL"
             row["error"] = (out.strip().splitlines() or ["memcpy_mixed_as failed"])[-1][:140]
             row["features"] = ["mcp:" + norm_msg(row["error"])]
             row["primary"] = row["features"][0]
             return row, {}, [], m4
+        txt = ll.read_text()
+    if psb_case(tag):
+        # the expanded row-copy leaves store-only pointer structs behind; a dead-store pass removes
+        # them (clspv's own cleanup runs too early), then the surviving pointer arrays are demoted
+        # to i64 slot allocas with select chains and every remaining pointer-typed access becomes
+        # an i64 access with inttoptr/ptrtoint at the edges: clspv's producer has no codegen for
+        # pointer-typed data (getSPIRVType on a pointer type is an unreachable that Release
+        # compiles out)
+        rc, out, _ = sh([OPT, "-passes=function(dse,dce,sroa,early-cse,simplifycfg)", "-S", str(ll), "-o", str(ll)])
+        if rc != 0:
+            row["ir"] = "FAIL"
+            row["error"] = (out.strip().splitlines() or ["dse failed"])[-1][:140]
+            row["features"] = ["dse:" + norm_msg(row["error"])]
+            row["primary"] = row["features"][0]
+            return row, {}, [], m4
+        for psb_pass in ("psb_promote_ptr_arrays.py", "psb_ptr_to_int.py"):
+            rc, out, _ = sh([sys.executable, str(HERE / psb_pass), str(ll)])
+            if rc != 0:
+                row["ir"] = "FAIL"
+                row["error"] = (out.strip().splitlines() or [psb_pass + " failed"])[-1][:140]
+                row["features"] = ["psbpa:" + norm_msg(row["error"])]
+                row["primary"] = row["features"][0]
+                return row, {}, [], m4
         txt = ll.read_text()
     # a private array of pointers (buffer-select table) cannot be represented by clspv's
     # producer; promote small ones to scalar allocas with select chains (no-op otherwise)
@@ -1677,7 +1713,11 @@ def process_once(setname, src_path, rel, eidx, kname, targs, outdir, include_dir
         txt = ll.read_text()
     spv = d / "spv" / (tag + ".spv")
     spv.parent.mkdir(parents=True, exist_ok=True)
-    rc, out, _ = sh([CLSPV, "-x", "ir", "--cl-std=CLC++2021", "--fp16", "--inline-entry-points", "--spv-version=1.5", "--long-vector", str(ll), "-o", str(spv)], CLSPV_TIMEOUT)
+    psb = psb_case(tag)
+    psb_flags = ["--arch=spir64", "--physical-storage-buffers"] if psb else []
+    if psb:
+        row["psb"] = True
+    rc, out, _ = sh([CLSPV, "-x", "ir", "--cl-std=CLC++2021", "--fp16", "--inline-entry-points", "--spv-version=1.5", "--long-vector", *psb_flags, str(ll), "-o", str(spv)], CLSPV_TIMEOUT)
     lines = [ln for ln in out.splitlines() if ln.strip() and not ln.startswith("warning: ")]
     if os.environ.get("M2V_KEEP_CLSPV_LOG"):
         logd = d / "clspvlog"
