@@ -1,0 +1,32 @@
+{
+ "module": "mlx-vlm/mlx_vlm/turboquant.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/turboquant.py:237",
+ "call": "packed uint32 (4,2); Bits=4,Length=8,PackedWidth=2; grid=(8,4,1), threadgroup=(32,1,1); out (4,8) uint32",
+ "inputs": [
+  {
+   "name": "packed",
+   "dtype": "uint32",
+   "ndim": 2,
+   "size": 8
+  }
+ ],
+ "outputs": [
+  "uint32"
+ ],
+ "template": [
+  [
+   "Bits",
+   4
+  ],
+  [
+   "Length",
+   8
+  ],
+  [
+   "PackedWidth",
+   2
+  ]
+ ],
+ "factory": "_unpack_lowbit_kernel",
+ "args": []
+}

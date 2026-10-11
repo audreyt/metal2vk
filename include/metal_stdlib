@@ -46,6 +46,9 @@ template <typename A, typename B> constexpr bool is_same_v = is_same<A, B>::valu
 template <bool C, typename T = void> struct enable_if {};
 template <typename T> struct enable_if<true, T> { using type = T; };
 template <bool C, typename T = void> using enable_if_t = typename enable_if<C, T>::type;
+// clang's builtin keeps this one-liner honest where a declval SFINAE port would drag in reference machinery
+template <typename From, typename To> struct is_convertible : integral_constant<bool, __is_convertible_to(From, To)> {};
+template <typename From, typename To> constexpr bool is_convertible_v = is_convertible<From, To>::value;
 template <bool C, typename A, typename B> struct conditional { using type = A; };
 template <typename A, typename B> struct conditional<false, A, B> { using type = B; };
 template <bool C, typename A, typename B> using conditional_t = typename conditional<C, A, B>::type;
@@ -408,3 +411,4 @@ METAL_FUNC void simdgroup_multiply_accumulate(
 using namespace metal;
 #include "m2v_vec_ctors.h"
 #include "m2v_extra.h"
+#include "mlx_prelude.h"

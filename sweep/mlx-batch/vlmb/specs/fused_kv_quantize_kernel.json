@@ -1,0 +1,68 @@
+{
+ "module": "mlx-vlm/mlx_vlm/turboquant.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/turboquant.py:2800",
+ "call": "fused kv quantize: key/vectors (1,64) float16, rotations (64,64) float32, midpoints (15) float32; Dim=64,KPackedWidth=VPackedWidth=2; grid=(64,2,1), threadgroup=(64,1,1); out key/val norms (1) float16, key/val packed (1,2) uint32",
+ "inputs": [
+  {
+   "name": "key_vectors",
+   "dtype": "float16",
+   "ndim": 2,
+   "size": 64
+  },
+  {
+   "name": "val_vectors",
+   "dtype": "float16",
+   "ndim": 2,
+   "size": 64
+  },
+  {
+   "name": "key_rotation",
+   "dtype": "float32",
+   "ndim": 2,
+   "size": 4096
+  },
+  {
+   "name": "val_rotation",
+   "dtype": "float32",
+   "ndim": 2,
+   "size": 4096
+  },
+  {
+   "name": "key_midpoints",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 15
+  },
+  {
+   "name": "val_midpoints",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 15
+  }
+ ],
+ "outputs": [
+  "float16",
+  "uint32",
+  "float16",
+  "uint32"
+ ],
+ "template": [
+  [
+   "Dim",
+   64
+  ],
+  [
+   "KPackedWidth",
+   2
+  ],
+  [
+   "VPackedWidth",
+   2
+  ]
+ ],
+ "factory": "_fused_kv_quantize_kernel",
+ "args": [
+  4,
+  4
+ ]
+}

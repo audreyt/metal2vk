@@ -1,0 +1,44 @@
+{
+ "module": "mlx-vlm/mlx_vlm/quantization/one_bit.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/quantization/one_bit.py:240",
+ "call": "x (16,512) float16, weight uint32 (64,16), scales/biases (64,8) float16; T=float16, group_size=64; grid=(128,1,1), threadgroup=(128,1,1); out (1024) float16",
+ "inputs": [
+  {
+   "name": "x",
+   "dtype": "float16",
+   "ndim": 2,
+   "size": 8192
+  },
+  {
+   "name": "weight",
+   "dtype": "uint32",
+   "ndim": 2,
+   "size": 1024
+  },
+  {
+   "name": "scales",
+   "dtype": "float16",
+   "ndim": 2,
+   "size": 512
+  },
+  {
+   "name": "biases",
+   "dtype": "float16",
+   "ndim": 2,
+   "size": 512
+  }
+ ],
+ "outputs": [
+  "float16"
+ ],
+ "template": [
+  [
+   "T",
+   "float16"
+  ]
+ ],
+ "factory": "_one_bit_qmm_kernel",
+ "args": [
+  64
+ ]
+}

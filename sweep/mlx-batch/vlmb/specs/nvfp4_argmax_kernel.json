@@ -1,0 +1,58 @@
+{
+ "module": "mlx-vlm/mlx_vlm/models/quantized_verifier.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/models/quantized_verifier.py:1974",
+ "call": "nvfp4 argmax: x (1,2,64) float16, w uint32 (64,8), scales uint8 (64,4); T=float16,VERIFY_T=2,K_SIZE=64,N_SIZE=64,NUM_TILES=8; grid=(32,16,1), threadgroup=(32,2,1); tile_values (1,2,8) float16, tile_indices (1,2,8) int32",
+ "inputs": [
+  {
+   "name": "x",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 128
+  },
+  {
+   "name": "w",
+   "dtype": "uint32",
+   "ndim": 2,
+   "size": 512
+  },
+  {
+   "name": "scales",
+   "dtype": "uint8",
+   "ndim": 2,
+   "size": 256
+  }
+ ],
+ "outputs": [
+  "float16",
+  "int32"
+ ],
+ "template": [
+  [
+   "T",
+   "float16"
+  ],
+  [
+   "VERIFY_T",
+   2
+  ],
+  [
+   "K_SIZE",
+   64
+  ],
+  [
+   "N_SIZE",
+   64
+  ],
+  [
+   "NUM_TILES",
+   8
+  ]
+ ],
+ "factory": "_nvfp4_argmax_kernel",
+ "args": [
+  "float16",
+  2,
+  64,
+  64
+ ]
+}

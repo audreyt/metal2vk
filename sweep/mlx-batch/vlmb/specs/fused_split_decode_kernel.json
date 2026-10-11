@@ -1,0 +1,200 @@
+{
+ "module": "mlx-vlm/mlx_vlm/turboquant.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/turboquant.py:3346",
+ "call": "split decode (4,4): q_rot/q_proj low+high (1,1,1,64) float16, key low/high norms and residual norms (1,1,2) float16, mse/indices (1,1,2,8) uint32, signs (1,1,2,2) uint32, codebooks (16) float32, scales (1) float32; DimLow=DimHigh=64,RepeatCount=1,TokTileSize=1024, packed widths 8/2; grid=(32,2,1), threadgroup=(32,1,1); out_acc (1,1,1,64) float32, out_sum/out_max (1,1,1) float32",
+ "inputs": [
+  {
+   "name": "q_rot_low",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 64
+  },
+  {
+   "name": "q_proj_low",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 64
+  },
+  {
+   "name": "q_rot_high",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 64
+  },
+  {
+   "name": "q_proj_high",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 64
+  },
+  {
+   "name": "key_low_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "key_low_mse",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 16
+  },
+  {
+   "name": "key_low_res_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "key_low_signs",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 4
+  },
+  {
+   "name": "key_high_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "key_high_mse",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 16
+  },
+  {
+   "name": "key_high_res_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "key_high_signs",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 4
+  },
+  {
+   "name": "val_low_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "val_low_indices",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 16
+  },
+  {
+   "name": "val_high_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "val_high_indices",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 16
+  },
+  {
+   "name": "key_low_codebook",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 16
+  },
+  {
+   "name": "key_high_codebook",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 16
+  },
+  {
+   "name": "key_low_scale",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 1
+  },
+  {
+   "name": "key_high_scale",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 1
+  },
+  {
+   "name": "val_low_codebook",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 16
+  },
+  {
+   "name": "val_high_codebook",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 16
+  }
+ ],
+ "outputs": [
+  "float32",
+  "float32",
+  "float32"
+ ],
+ "template": [
+  [
+   "DimLow",
+   64
+  ],
+  [
+   "DimHigh",
+   64
+  ],
+  [
+   "RepeatCount",
+   1
+  ],
+  [
+   "TokTileSize",
+   1024
+  ],
+  [
+   "KLMsePackedWidth",
+   8
+  ],
+  [
+   "KLSignPackedWidth",
+   2
+  ],
+  [
+   "KHMsePackedWidth",
+   8
+  ],
+  [
+   "KHSignPackedWidth",
+   2
+  ],
+  [
+   "VLPackedWidth",
+   8
+  ],
+  [
+   "VHPackedWidth",
+   8
+  ],
+  [
+   "VLBits",
+   4
+  ],
+  [
+   "VHBits",
+   4
+  ]
+ ],
+ "factory": "_fused_split_decode_kernel",
+ "args": [
+  4,
+  4,
+  1
+ ]
+}

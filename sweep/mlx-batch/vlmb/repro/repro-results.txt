@@ -1,0 +1,21 @@
+full.metal	-	spirv-val failed
+v1_no_scoring.metal	v1_no_scoring	spirv-val failed
+v2_v3_v4.metal	v2_indices_only	ok
+v2_v3_v4.metal	v3_values_only	ok
+v2_v3_v4.metal	v4_flat_arrays	spirv-val failed
+v5_v6_v7.metal	v5_no_cross_read	ok
+v5_v6_v7.metal	v6_one_array_cross_read	spirv-val failed
+v5_v6_v7.metal	v7_two_arrays_ifelse	ok
+v8_v9_v10.metal	v8_min_guarded_tg_read	ok
+v8_v9_v10.metal	v9_min_guarded_const	ok
+v8_v9_v10.metal	v10_min_read_no_tg_update	ok
+v11_v12.metal	v11_int_update_only	spirv-val failed
+v11_v12.metal	v12_both_private_int	ok
+v13_v14_v15.metal	v13_uncond_store	spirv-val failed
+v13_v14_v15.metal	v14_guarded_store_plus_read	ok
+v13_v14_v15.metal	v15_tg_condition	ok
+v16.metal	v16_single_update_private_cond	spirv-val failed
+v17_v18.metal	v17_min_private_cond_tg_update	ok
+v17_v18.metal	v18_min_tg_cond_tg_update	ok
+v19_v20.metal	v19_no_first_pass	spirv-val failed
+v19_v20.metal	v20_single_token	spirv-val failed

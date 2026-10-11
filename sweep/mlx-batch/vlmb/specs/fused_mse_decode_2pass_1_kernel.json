@@ -1,0 +1,82 @@
+{
+ "module": "mlx-vlm/mlx_vlm/turboquant.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/turboquant.py:2525",
+ "call": "fused mse sdpa two-pass 1: same inputs as single pass; Dim=64,RepeatCount=2,Blocks=64,KPackedWidth=8,VPackedWidth=8; grid=(32,2,64), threadgroup=(32,2,1); out_acc (128,64) float32, out_sums/out_maxs (128) float32",
+ "inputs": [
+  {
+   "name": "q_rot_flat",
+   "dtype": "float16",
+   "ndim": 2,
+   "size": 128
+  },
+  {
+   "name": "key_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "key_packed",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 16
+  },
+  {
+   "name": "key_codebook",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 16
+  },
+  {
+   "name": "val_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "val_packed",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 16
+  },
+  {
+   "name": "val_codebook",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 16
+  }
+ ],
+ "outputs": [
+  "float32",
+  "float32",
+  "float32"
+ ],
+ "template": [
+  [
+   "Dim",
+   64
+  ],
+  [
+   "RepeatCount",
+   2
+  ],
+  [
+   "Blocks",
+   64
+  ],
+  [
+   "KPackedWidth",
+   8
+  ],
+  [
+   "VPackedWidth",
+   8
+  ]
+ ],
+ "factory": "_fused_mse_decode_2pass_1_kernel",
+ "args": [
+  4,
+  4,
+  64
+ ]
+}

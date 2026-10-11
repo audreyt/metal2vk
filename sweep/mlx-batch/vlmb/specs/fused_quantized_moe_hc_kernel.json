@@ -1,0 +1,112 @@
+{
+ "module": "mlx-vlm/mlx_vlm/models/quantized_verifier.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/models/quantized_verifier.py:477",
+ "call": "fused affine MoE+HC: x (1,2,2,512) float16, indices (1,2,2) int32, route_weights (1,2,2) float32, w uint32 (32,64), scales/biases (32,8) float16, shared (1,2,32), residual (1,2,2,32) float16, post/comb (1,2,2) float32; T=float16,BITS=4,GROUP_SIZE=64,K_SIZE=512,N_SIZE=32,TOP_K=2,HC=2; grid=(32,16,2), threadgroup=(32,4,1); out (1,2,2,32)",
+ "inputs": [
+  {
+   "name": "x",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 2048
+  },
+  {
+   "name": "indices",
+   "dtype": "int32",
+   "ndim": 3,
+   "size": 4
+  },
+  {
+   "name": "route_weights",
+   "dtype": "float32",
+   "ndim": 3,
+   "size": 4
+  },
+  {
+   "name": "w",
+   "dtype": "uint32",
+   "ndim": 2,
+   "size": 2048
+  },
+  {
+   "name": "scales",
+   "dtype": "float16",
+   "ndim": 2,
+   "size": 256
+  },
+  {
+   "name": "biases",
+   "dtype": "float16",
+   "ndim": 2,
+   "size": 256
+  },
+  {
+   "name": "shared",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 64
+  },
+  {
+   "name": "residual",
+   "dtype": "float16",
+   "ndim": 4,
+   "size": 128
+  },
+  {
+   "name": "post",
+   "dtype": "float32",
+   "ndim": 3,
+   "size": 4
+  },
+  {
+   "name": "comb",
+   "dtype": "float32",
+   "ndim": 3,
+   "size": 4
+  }
+ ],
+ "outputs": [
+  "float16"
+ ],
+ "template": [
+  [
+   "T",
+   "float16"
+  ],
+  [
+   "BITS",
+   4
+  ],
+  [
+   "GROUP_SIZE",
+   64
+  ],
+  [
+   "K_SIZE",
+   512
+  ],
+  [
+   "N_SIZE",
+   32
+  ],
+  [
+   "TOP_K",
+   2
+  ],
+  [
+   "HC",
+   2
+  ]
+ ],
+ "factory": "_fused_quantized_moe_hc_kernel",
+ "args": [
+  "affine",
+  4,
+  64,
+  "float16",
+  2,
+  512,
+  32,
+  2,
+  2
+ ]
+}

@@ -1,0 +1,62 @@
+{
+ "module": "mlx-vlm/mlx_vlm/turboquant.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/turboquant.py:1859",
+ "call": "single-tile value: weights (1,2,2) float32, norms (1,1,2) float16, indices (1,1,2,8) uint32, codebook (16) float32; Dim=64,RepeatCount=2,TokTileSize=1024,DimsPerLane=2,PackedWidth=8; grid=(64,1,1), threadgroup=(64,1,1); out (1,2,64) float32",
+ "inputs": [
+  {
+   "name": "weights",
+   "dtype": "float32",
+   "ndim": 3,
+   "size": 4
+  },
+  {
+   "name": "norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "indices",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 16
+  },
+  {
+   "name": "codebook",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 16
+  }
+ ],
+ "outputs": [
+  "float32"
+ ],
+ "template": [
+  [
+   "Dim",
+   64
+  ],
+  [
+   "RepeatCount",
+   2
+  ],
+  [
+   "TokTileSize",
+   1024
+  ],
+  [
+   "DimsPerLane",
+   2
+  ],
+  [
+   "PackedWidth",
+   8
+  ]
+ ],
+ "factory": "_single_tile_value_weighted_sum_kernel",
+ "args": [
+  4,
+  2,
+  2
+ ]
+}
