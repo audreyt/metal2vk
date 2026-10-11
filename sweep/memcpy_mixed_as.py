@@ -11,10 +11,18 @@ expansion correct even if the operands overlap; the signature says noalias, but 
 trivial at these sizes). Same-address-space memcpys are left for clspv, which lowers them
 to OpCopyMemory itself.
 
+--ptr-copies (physical-storage-buffer mode): a copy whose size is a whole number of
+pointers carries pointer values - raw device addresses, e.g. a Metal `device const
+ExpertPtrs*` table row. Those are expanded as pointer loads/stores instead of bytes: the
+loaded value is a `ptr addrspace(1)` (the address the bytes encode), which is exactly what
+a 64-bit physical-pointer module wants, and it is the only shape clspv's pointer-bitcast
+pass can rewrite without reassembling a pointer from bytes. Requires a 64-bit module
+(pointer size read from the datalayout); a mixed-size copy still falls back to bytes.
+
 Runs as a text pass between the clang/opt front end and clspv; a module without a
 mixed-address-space memcpy is a no-op.
 
-Usage: memcpy_mixed_as.py FILE.ll
+Usage: memcpy_mixed_as.py [--ptr-copies] FILE.ll
 """
 import pathlib
 import re
@@ -30,6 +38,13 @@ PTR = re.compile(r"^ptr(?: addrspace\((\d+)\))?(?: align (\d+))?(?: (?P<val>%[\w
 
 def die(msg):
     sys.exit("memcpy_mixed_as: " + msg)
+
+
+def pointer_size(txt):
+    # spir64 modules carry 8-byte addresses; the 32-bit default keeps the byte expansion
+    if re.search(r'^target triple = "spir64"', txt, re.M):
+        return 8
+    return 4
 
 
 def split_args(text):
@@ -57,10 +72,15 @@ def parse_ptr(arg):
 
 
 def main():
-    if len(sys.argv) != 2:
-        die("usage: memcpy_mixed_as.py FILE.ll")
-    path = pathlib.Path(sys.argv[1])
-    lines = path.read_text().splitlines(keepends=True)
+    args = [a for a in sys.argv[1:]]
+    ptr_mode = "--ptr-copies" in args
+    args = [a for a in args if a != "--ptr-copies"]
+    if len(args) != 1:
+        die("usage: memcpy_mixed_as.py [--ptr-copies] FILE.ll")
+    path = pathlib.Path(args[0])
+    txt = path.read_text()
+    psize = pointer_size(txt) if ptr_mode else 0
+    lines = txt.splitlines(keepends=True)
 
     out = []
     changed = False
@@ -70,13 +90,13 @@ def main():
         if not m:
             out.append(line)
             continue
-        args = split_args(m.group("args"))
-        if len(args) != 4:
+        cargs = split_args(m.group("args"))
+        if len(cargs) != 4:
             out.append(line)
             continue
-        dst, src = parse_ptr(args[0]), parse_ptr(args[1])
-        size_m = re.fullmatch(r"i32 (\d+)", args[2]) or re.fullmatch(r"i64 (\d+)", args[2])
-        vol = args[3].strip() == "true"
+        dst, src = parse_ptr(cargs[0]), parse_ptr(cargs[1])
+        size_m = re.fullmatch(r"i32 (\d+)", cargs[2]) or re.fullmatch(r"i64 (\d+)", cargs[2])
+        vol = cargs[3].strip() == "true"
         if not dst or not src or not size_m or dst[2] is None or src[2] is None:
             out.append(line)
             continue
@@ -89,6 +109,23 @@ def main():
         if size == 0:
             continue  # drop the no-op copy
         stail = ", volatile\n" if vol else "\n"
+        if psize and size % psize == 0:
+            # pointer copies: one typed load/store pair per pointer-sized chunk
+            for k in range(size // psize):
+                seq += 1
+                if k == 0:
+                    sptr = src[2]
+                    dptr = dst[2]
+                else:
+                    out.append(f"{indent}%mcp{seq}g = getelementptr i8, ptr addrspace({src[0]}) {src[2]}, i64 {k * psize}\n")
+                    sptr = f"%mcp{seq}g"
+                    seq += 1
+                    out.append(f"{indent}%mcp{seq}g = getelementptr i8, ptr addrspace({dst[0]}) {dst[2]}, i64 {k * psize}\n")
+                    dptr = f"%mcp{seq}g"
+                seq += 1
+                out.append(f"{indent}%mcp{seq} = load ptr addrspace(1), ptr addrspace({src[0]}) {sptr}, align {psize}{stail}")
+                out.append(f"{indent}store ptr addrspace(1) %mcp{seq}, ptr addrspace({dst[0]}) {dptr}, align {psize}{', volatile' if vol else ''}\n")
+            continue
         # loads first: every source byte, in offset order
         names = []
         for i in range(size):

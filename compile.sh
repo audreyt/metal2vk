@@ -28,8 +28,14 @@ CASES=${*:-activation softmax tilematmul tilematmul_rt gemm}
 mkdir -p "$OUT"
 for c in $CASES; do
   echo "== $c"
+  # physical-storage-buffer mode (opt-in): M2V_PSB_CASES is a list of case-name substrings; a matching case is
+  # compiled as a 64-bit module (clang --target=spir64, clspv --arch=spir64 --physical-storage-buffers), which is
+  # the only way to express a buffer of raw device addresses (Metal `device const ExpertPtrs* table`). Every other
+  # case keeps the 32-bit module, byte for byte.
+  PSB=0
+  for p in ${M2V_PSB_CASES:-}; do case "$c" in *"$p"*) PSB=1 ;; esac; done
   # shellcheck disable=SC2086
-  "$CLANG" --target=spir -x cl -cl-std=clc++2021 -Xclang -finclude-default-header \
+  "$CLANG" --target=$( [ "$PSB" = 1 ] && echo spir64 || echo spir ) -x cl -cl-std=clc++2021 -Xclang -finclude-default-header \
     -cl-ext=-__opencl_c_generic_address_space $FE_OPT -fno-strict-return -cl-kernel-arg-info -w ${M2V_DEFS:-} \
     -I"$H/include" -I"$K" -I"$K/generated" -S -emit-llvm "$H/cases/$c.cl" -o "$OUT/$c.ll" 2>&1 | head -"${LINES_MAX:-20}"
   [ -s "$OUT/$c.ll" ] || continue
@@ -46,14 +52,22 @@ for c in $CASES; do
   sed -i -E 's/, !(alias\.scope|noalias) ![0-9]+//g; /llvm\.experimental\.noalias\.scope\.decl/d' "$OUT/$c.ll"
   # the shim's bfloat is a real __bf16 on clang 20+; clspv rejects that LLVM type, so retype it to i16 first (no-op otherwise)
   grep -qE '(^|[^A-Za-z0-9_.])bfloat\b' "$OUT/$c.ll" && python3 "$H/sweep/bfloat_to_i16.py" "$OUT/$c.ll"
-  # a memcpy between distinct address spaces aborts clspv's intrinsics pass; expand it first (no-op otherwise)
-  grep -q '@llvm.memcpy' "$OUT/$c.ll" && python3 "$H/sweep/memcpy_mixed_as.py" "$OUT/$c.ll" || true
+  # a memcpy between distinct address spaces aborts clspv's intrinsics pass; expand it first (no-op otherwise);
+  # a PSB case copies pointer-valued rows as pointers, then drops the dead row-copy structs and promotes the
+  # surviving pointer arrays to slot allocas (clspv's producer has no SPIR-V type for pointer-typed storage)
+  grep -q '@llvm.memcpy' "$OUT/$c.ll" && python3 "$H/sweep/memcpy_mixed_as.py" $( [ "$PSB" = 1 ] && echo --ptr-copies ) "$OUT/$c.ll" || true
+  if [ "$PSB" = 1 ]; then
+    "$OPT" -passes='function(dse)' -S "$OUT/$c.ll" -o "$OUT/$c.ll"
+    python3 "$H/sweep/psb_promote_ptr_arrays.py" "$OUT/$c.ll"
+  fi
   # a private array of pointers (buffer-select table) is not representable by clspv; promote it (no-op otherwise)
   grep -qE 'alloca \[[0-9]+ x ptr addrspace\([0-9]+\)\]' "$OUT/$c.ll" && python3 "$H/sweep/promote_ptr_arrays.py" "$OUT/$c.ll" || true
   # pointer members of kernel argument structs are inexpressible on 32-bit Vulkan; hoist the
   # loaded ones to buffer arguments and retype the dead ones (no-op otherwise)
   grep -qE '^%[A-Za-z0-9_.]+ = type \{.*ptr addrspace' "$OUT/$c.ll" && python3 "$H/sweep/hoist_struct_ptr_args.py" "$OUT/$c.ll" || true
-  "$CLSPV" -x ir --cl-std=CLC++2021 --fp16 --inline-entry-points --spv-version=1.5 --long-vector "$OUT/$c.ll" -o "$OUT/$c.spv" > "$OUT/$c.clspv.log" 2>&1
+  PSB_FLAGS=$( [ "$PSB" = 1 ] && echo "--arch=spir64 --physical-storage-buffers" || true )
+  # shellcheck disable=SC2086
+  "$CLSPV" -x ir --cl-std=CLC++2021 --fp16 --inline-entry-points --spv-version=1.5 --long-vector $PSB_FLAGS "$OUT/$c.ll" -o "$OUT/$c.spv" > "$OUT/$c.clspv.log" 2>&1
   grep -v "^warning: \(overriding the module target\|Linking two modules\)" "$OUT/$c.clspv.log" | grep -v "^$" | head -"${LINES_MAX:-20}"
   # a pointer pass that gave up leaves a half rewritten module that clspv still compiles into wrong code: keep no SPIR-V.
   # M2V-GIVEUP marks every give-up/skip path of the pointer-bitcast pass; a module that hit one is not provably correct.
