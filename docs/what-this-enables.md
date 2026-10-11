@@ -4,7 +4,7 @@ Many fast AI programs for Apple Silicon are written in Metal, Apple's GPU langua
 
 The models that depend on these kernels are the ones whose speed comes from custom code. They are Qwen3.5-class mixture-of-experts models and gated-delta-net models served through oMLX, mlx-lm and mlx-vlm, the Mirai uzu engine, and the TensorFold Zig engine.
 
-What has been measured so far: out of 610 Metal kernels taken from the real uzu and TensorFold sources, 606 compile to valid Vulkan programs. That includes all 121 uzu kernels. Of 32 sampled oMLX, mlx-lm and mlx-vlm kernels, 31 compile. These 31 were run on an M1. They were checked against a reference. The reference is the original translator's output where it had one, otherwise a step-by-step Python model of the Metal source. All 31 agree.
+What has been measured so far: out of 610 Metal kernels taken from the real uzu and TensorFold sources, all 610 compile to valid Vulkan programs. 606 do so by default. The last 4 need an opt-in 64-bit mode and have not run on a GPU. That includes all 121 uzu kernels. Of 32 sampled oMLX, mlx-lm and mlx-vlm kernels, 31 compile. These 31 were run on an M1. They were checked against a reference. The reference is the original translator's output where it had one, otherwise a step-by-step Python model of the Metal source. All 31 agree.
 
 Two differences stay inside what the Metal source leaves open. Five values out of about 9,200 in one mixture-of-experts kernel differ by 2 to 3 units in the last place of a 16-bit float. That is the order in which the GPU adds partial sums. In one attention kernel, about 0.4 percent of the values differ by at most 0.02 percent of the largest value in their row. Metal does not fix the exact rounding of its exponential function. The check still fails when a block of keys is skipped or the mask is shifted by one row.
 
@@ -14,7 +14,7 @@ What has not been measured yet: how fast whole models run through this route. Th
 
 | Measured | Result |
 |---|---|
-| Kernels from uzu and TensorFold that compile to valid Vulkan programs | 606 of 610 |
+| Kernels from uzu and TensorFold that compile to valid Vulkan programs | 610 of 610 (606 by default, 4 in an opt-in 64-bit mode) |
 | uzu kernels that compile | 121 of 121 |
 | oMLX, mlx-lm, mlx-vlm kernels sampled: compile | 31 of 32 |
 | Same kernels, run on an M1 and checked against a reference | 31 of 31 agree (5 values of about 9,200 differ by 2 to 3 units in the last place in one kernel; about 0.4% of the values in one attention kernel differ by at most 0.02% of their row's largest value) |
