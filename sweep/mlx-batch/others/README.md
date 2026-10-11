@@ -34,7 +34,7 @@ repeat it), so this family carries no second row for it.
 | gated_delta_step_vec | mlx-lm@2184db2:mlx_lm/models/gated_delta.py:130 | vectorized g [B,T,Hv,Dk] | 5730fa0f0ca6 |
 | gated_delta_step_vec_masked | mlx-lm@2184db2:mlx_lm/models/gated_delta.py:130 | vectorized g + bool mask | 51292b26fbac |
 | gated_delta_step_xtree | mlx-lm@2184db2:mlx_lm/models/gated_delta.py:225 | scalar g, unmasked, explicit shuffle_xor tree | 4869eb6abbfa |
-| gated_delta_step_packed_btree | mlx-lm@2184db2:mlx_lm/models/gated_delta.py:352 | Dk=128, 8 rows/SIMD, scalar g | 0fffa9c6b488 | logits_q/p float [...,V=8192], T=float,V=8192; 2 outputs | a30c61d33554 |
+| gated_delta_step_packed_btree | mlx-lm@2184db2:mlx_lm/models/gated_delta.py:352 | Dk=128, 8 rows/SIMD, scalar g | 0fffa9c6b488 |
 | kl_backward | mlx-lm@2184db2:mlx_lm/tuner/losses.py:329 | logits_q/p float [...,V=8192], cotan float, T=float,V=8192 | 78ff53b7e9eb |
 | js_forward | mlx-lm@2184db2:mlx_lm/tuner/losses.py:564 | logits_q/p float [...,V=8192], 2 outputs float, T=float,V=8192 | e834b696935e |
 | js_backward | mlx-lm@2184db2:mlx_lm/tuner/losses.py:735 | logits_q/p float, cotan+output_kl_q float, out_q float | 3fd1d7ba67b1 |

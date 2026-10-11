@@ -23,7 +23,7 @@ Combined with the existing 32-kernel sibling corpus (TensorFold layout, 31 compi
 - 107 AST `metal_kernel()` callsites across the four pinned upstream trees (mlx-lm@2184db2: 11; mlx-examples@796f5b5: 3; mlx-vlm@8f5dc3d: 85; mlx-audio@17001a6: 8). This corrects the earlier draft's 106: `mlx-examples musicgen/encodec.py:14` is a real third mlx-examples callsite, not a duplicate of the census.
 - The 119 rows cover 105 distinct callsites. The other 14 rows are extra variants out of the multi-variant generators: `mlx_lm/models/gated_delta.py:130` (4 bodies), `mlx_vlm/models/gated_delta.py:148` (8), `mlx_vlm/models/qwen3_5/gated_delta.py:109` (4), `qwen3_5/gated_delta.py:540` (2).
 - Equation: 105 covered + 2 not assembled = 107 callsites (check). The 2 not assembled carry no new kernel body: `mlx-vlm bitnet/bitlinear.py:44` (the same `bitlinear_matmul` body as mlx-lm's, owned by the parent `results.tsv`) and `mlx-examples musicgen/encodec.py:14` (the same body as `encodec/encodec.py:14`, owned by `others`). The earlier draft's "103 assembled + 3 not-assembled = 106" guessed the gaps were the two mlx-examples lstm callsites; in fact both mlx-examples encodec sites are assembled and the real gaps are the duplicate-body sites.
-- Distinct assembled-source sha256 count across `sweep/mlx-batch/**.metal`: 119 (no two files share bytes).
+- Result-row source sha256: 119 distinct (no two assembled rows share bytes). The `vlmb/repro/` isolation files are not result rows; `repro/full.metal` repeats the failing nvfp4 source verbatim by design.
 - The wwdc25 notebook callsite is counted once (file-level; one `metal_kernel()` call in one code cell).
 
 ## Failures and classification
@@ -59,7 +59,7 @@ python3 sweep/mlx-batch/run_batch.py \
   --results sweep/mlx-batch/<family>/results-<family>.tsv
 ```
 
-`run_batch.py` reads the `// Origin:` and `// Representative call:` header comments, compiles each `.metal` with `tools/m2v-compile`, validates the produced SPIR-V with `spirv-val --target-env vulkan1.3`, and writes a per-row result line. The `vlmA`, `vlmb` and `others` families document their own assembler commands in their READMEs; `vlmb` regenerates byte-identically from its committed specs.
+`run_batch.py` reads the `// Origin:` and `// Representative call:` header comments, compiles each `.metal` with `tools/m2v-compile`, validates the produced SPIR-V with `spirv-val --target-env vulkan1.3`, and writes a per-row result line. It scans `--msl-dir` non-recursively, so the top-level call (`--msl-dir sweep/mlx-batch`) compiles exactly the 14 top rows and a family call compiles exactly that family's own sources (the nested `vlmA/`, `vlmb/`, `others/`, `vlmb/repro/` directories keep their own tables and runners). The `vlmA`, `vlmb` and `others` families document their own assembler commands in their READMEs; `vlmb` regenerates byte-identically from its committed specs.
 
 ## CI coverage floor
 

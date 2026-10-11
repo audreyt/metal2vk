@@ -22,6 +22,7 @@ the toolchain (CLANG, OPT, CLSPV, SPIRV_VAL) comes from the sweep env.sh.
 """
 import argparse
 import ast
+import hashlib
 import json
 import os
 import pathlib
@@ -666,7 +667,6 @@ def run(outdir, m2v, results_path, m2v_cache=None, metals_dir=None):
                          "valid": "no", "first_error": "timeout", "m2v_giveup": "no",
                          "representative_call": spec["representative"], "cause": "timeout"})
             continue
-        import hashlib
         ok = r.returncode == 0
         if ok:
             # m2v-compile prints JSON line on success
@@ -716,7 +716,6 @@ def _classify(j, r, spec):
 
 
 if __name__ == "__main__":
-    import hashlib
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="build", help="build artifact directory (.spv/.json)")
     ap.add_argument("--metals", default=None, help="where the .metal sources land (default: same as --out)")

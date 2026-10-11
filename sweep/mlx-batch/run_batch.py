@@ -51,7 +51,9 @@ def main() -> int:
     env["CLSPV"] = str(args.clspv)
     env["M2V_CACHE_DIR"] = str(args.cache)
     rows = []
-    for msl in sorted(args.msl_dir.rglob("*.metal")):
+    # non-recursive: the family directories (vlmA/, vlmb/, others/, repro/) keep their own
+    # tables and runners, so a per-family --msl-dir must not sweep the subdirectories
+    for msl in sorted(args.msl_dir.glob("*.metal")):
         source = msl.read_text()
         name = entry_name(source)
         digest = hashlib.sha256(msl.read_bytes()).hexdigest()
