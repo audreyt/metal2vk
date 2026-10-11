@@ -57,8 +57,9 @@ for c in $CASES; do
   # surviving pointer arrays to slot allocas (clspv's producer has no SPIR-V type for pointer-typed storage)
   grep -q '@llvm.memcpy' "$OUT/$c.ll" && python3 "$H/sweep/memcpy_mixed_as.py" $( [ "$PSB" = 1 ] && echo --ptr-copies ) "$OUT/$c.ll" || true
   if [ "$PSB" = 1 ]; then
-    "$OPT" -passes='function(dse)' -S "$OUT/$c.ll" -o "$OUT/$c.ll"
+    "$OPT" -passes='function(dse,dce,sroa,early-cse,simplifycfg)' -S "$OUT/$c.ll" -o "$OUT/$c.ll"
     python3 "$H/sweep/psb_promote_ptr_arrays.py" "$OUT/$c.ll"
+    python3 "$H/sweep/psb_ptr_to_int.py" "$OUT/$c.ll"
   fi
   # a private array of pointers (buffer-select table) is not representable by clspv; promote it (no-op otherwise)
   grep -qE 'alloca \[[0-9]+ x ptr addrspace\([0-9]+\)\]' "$OUT/$c.ll" && python3 "$H/sweep/promote_ptr_arrays.py" "$OUT/$c.ll" || true

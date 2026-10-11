@@ -86,10 +86,29 @@ new = """  } else {
 
   return nullptr;
 }"""
-if new in s:
+old2 = """      // Create a reusable cast to an integer type for this element.
+      if (!ele_int_cast || cast<User>(ele_int_cast)->getOperand(0) != ele) {
+        ele_int_cast =
+            builder.CreateBitCast(ele, IntegerType::get(context, ele_width));
+      }"""
+new2 = """      // Create a reusable cast to an integer type for this element.
+      // metal2vk (apply-ptr-convert-route): a pointer element has no bitcast
+      // to an integer in LLVM; ptrtoint is the same bits.
+      if (!ele_int_cast || cast<User>(ele_int_cast)->getOperand(0) != ele) {
+        if (ele->getType()->isPointerTy()) {
+          ele_int_cast = builder.CreatePtrToInt(
+              ele, IntegerType::get(context, ele_width));
+        } else {
+          ele_int_cast = builder.CreateBitCast(
+              ele, IntegerType::get(context, ele_width));
+        }
+      }"""
+if new in s and new2 in s:
     print("already patched")
     sys.exit(0)
 if s.count(old) != 1:
     raise SystemExit(f"anchor count mismatch: {s.count(old)} (want 1)")
-utils.write_text(s.replace(old, new, 1))
+if s.count(old2) != 1:
+    raise SystemExit(f"anchor2 count mismatch: {s.count(old2)} (want 1)")
+utils.write_text(s.replace(old, new, 1).replace(old2, new2, 1))
 print(f"patched (clspv HEAD {sha[:8]})")

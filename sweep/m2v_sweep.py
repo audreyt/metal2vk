@@ -1666,23 +1666,26 @@ def process_once(setname, src_path, rel, eidx, kname, targs, outdir, include_dir
         txt = ll.read_text()
     if psb_case(tag):
         # the expanded row-copy leaves store-only pointer structs behind; a dead-store pass removes
-        # them (clspv's own cleanup runs too early), then the surviving pointer arrays are promoted
-        # to slot allocas with select chains: clspv's producer has no SPIR-V type for pointer-typed
-        # storage (getSPIRVType on a pointer type is an unreachable that Release compiles out)
-        rc, out, _ = sh([OPT, "-passes=function(dse)", "-S", str(ll), "-o", str(ll)])
+        # them (clspv's own cleanup runs too early), then the surviving pointer arrays are demoted
+        # to i64 slot allocas with select chains and every remaining pointer-typed access becomes
+        # an i64 access with inttoptr/ptrtoint at the edges: clspv's producer has no codegen for
+        # pointer-typed data (getSPIRVType on a pointer type is an unreachable that Release
+        # compiles out)
+        rc, out, _ = sh([OPT, "-passes=function(dse,dce,sroa,early-cse,simplifycfg)", "-S", str(ll), "-o", str(ll)])
         if rc != 0:
             row["ir"] = "FAIL"
             row["error"] = (out.strip().splitlines() or ["dse failed"])[-1][:140]
             row["features"] = ["dse:" + norm_msg(row["error"])]
             row["primary"] = row["features"][0]
             return row, {}, [], m4
-        rc, out, _ = sh([sys.executable, str(HERE / "psb_promote_ptr_arrays.py"), str(ll)])
-        if rc != 0:
-            row["ir"] = "FAIL"
-            row["error"] = (out.strip().splitlines() or ["psb_promote_ptr_arrays failed"])[-1][:140]
-            row["features"] = ["psbpa:" + norm_msg(row["error"])]
-            row["primary"] = row["features"][0]
-            return row, {}, [], m4
+        for psb_pass in ("psb_promote_ptr_arrays.py", "psb_ptr_to_int.py"):
+            rc, out, _ = sh([sys.executable, str(HERE / psb_pass), str(ll)])
+            if rc != 0:
+                row["ir"] = "FAIL"
+                row["error"] = (out.strip().splitlines() or [psb_pass + " failed"])[-1][:140]
+                row["features"] = ["psbpa:" + norm_msg(row["error"])]
+                row["primary"] = row["features"][0]
+                return row, {}, [], m4
         txt = ll.read_text()
     # a private array of pointers (buffer-select table) cannot be represented by clspv's
     # producer; promote small ones to scalar allocas with select chains (no-op otherwise)

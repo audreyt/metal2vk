@@ -1,34 +1,37 @@
 #!/usr/bin/env python3
-"""Promote private arrays of device pointers to slot allocas with select chains (PSB mode).
+"""Demote private arrays of device pointers to i64 slot allocas (PSB mode).
 
 The kimi/experts kernels keep the per-lane weight pointers of the current table row in a
 private array (`alloca [N x ptr addrspace(1)]`): the stores pick static slots, a helper
 reads the slots back through a loop index (a dynamic `getelementptr [N x ptr
 addrspace(1)]` whose base escaped through an `addrspacecast ptr %arr to ptr
-addrspace(4)`). clspv's producer cannot generate a SPIR-V type for pointer-typed storage
-(getSPIRVType on a pointer type is an unreachable that Release compiles out, leaving a
-segfault), so the array must not reach it.
+addrspace(4)`). clspv cannot compile pointer-typed storage: its producer's getSPIRVType
+is an unreachable on a pointer type (compiled out in Release, leaving a segfault), and
+that unreachable also kills the pointer loads a slot-alloca promotion would leave behind
+(upstream code contains no codegen for a pointer-typed OpLoad from private memory).
 
-This pass rewrites the array exactly like sweep/promote_ptr_arrays.py rewrites the
-buffer-select tables, plus the two shapes that pass does not match: stores that address
-the array directly or through a constant-index element GEP, and loads whose GEP base is
-the generic-address-space cast of the array.
+So this pass moves the row through 64-bit integers, which is also what the PSB address
+model wants: every slot becomes an `alloca i64`, stores go through ptrtoint, loads come
+back through inttoptr, and a dynamic index loads every slot and selects the value. The
+bits are unchanged, so each pointer is exactly the raw table address the source held.
 
-  store ptr addrspace(1) %v, ptr %arr                  -> store to slot 0
+  store ptr addrspace(1) %v, ptr %arr                  -> ptrtoint + store to slot 0
   %g = getelementptr inbounds ptr addrspace(1), ptr %arr, i64 <c>
-  store ptr addrspace(1) %v, ptr %g                    -> store to slot <c>
+  store ptr addrspace(1) %v, ptr %g                    -> ptrtoint + store to slot <c>
   %c = addrspacecast ptr %arr to ptr addrspace(4)
   %g = getelementptr inbounds [N x ptr addrspace(1)], ptr addrspace(4) %c, i64 0, i64 %i
-  %l = load ptr addrspace(1), ptr addrspace(4) %g      -> per-slot loads plus an
-                                                          icmp/select chain over %i; a
-                                                          single slot loads straight
+  %l = load ptr addrspace(1), ptr addrspace(4) %g      -> i64 slot loads, an icmp/select
+                                                          chain over %i, then inttoptr
+                                                          (a single slot loads straight);
+                                                          %l keeps its name
 
-Each slot starts as null, so an out-of-range index yields null exactly where the source
-had undefined behaviour. The gep and the cast are dropped when nothing reads them anymore.
-Anything else (a dynamic store, a second user of the cast, more than 16 slots) is left
-untouched for clspv, which then fails the module visibly instead of miscompiling it.
-Run after the dead row-copy structs are removed (opt -passes=function(dse)), which is what
-leaves every surviving pointer alloca in the shape this pass matches.
+Each slot starts as 0, so an out-of-range index yields a null pointer exactly where the
+source had undefined behaviour. The array alloca, its geps and its cast are dropped when
+nothing reads them anymore. Anything else (a dynamic store, a second user of the cast,
+more than 16 slots, a pointer address space other than 1) is left untouched for clspv,
+which then fails the module visibly instead of miscompiling it. Run after the dead
+row-copy structs are removed (opt -passes=function(dse)), which is what leaves every
+surviving pointer alloca in the shape this pass matches.
 
 Usage: psb_promote_ptr_arrays.py FILE.ll (in place; a module without the shape is a no-op)
 """
@@ -73,14 +76,12 @@ def rewrite_function(chunk):
     if not arrays:
         return chunk, 0
 
-    # const-index element geps on the arrays (static store addressing)
     const_geps = {}  # gep name -> (array, slot)
     for line in chunk:
         m = GEP_CONST.match(line)
         if m and m.group(3) in arrays:
             const_geps[m.group(2)] = (m.group(3), int(m.group(4)))
 
-    # dynamic geps through the generic cast of an array
     casts = {}  # cast name -> array
     for line in chunk:
         m = CAST.match(line)
@@ -94,80 +95,85 @@ def rewrite_function(chunk):
     if not dyn_geps:
         return chunk, 0
 
-    # classify every consumer; an array with a store or load this pass cannot rewrite
-    # (a dynamic store, a second use of a gep, anything else naming its geps) is skipped
-    load_geps, store_geps, bad = {}, {}, set()
-    for i, line in enumerate(chunk):
+    # classify every consumer; a store or load this pass cannot rewrite (a dynamic
+    # store, a second use of a gep or cast, anything else naming a managed name) skips
+    # the array
+    load_geps, bad = {}, set()
+    for cname, arr in casts.items():
+        # every use of the cast must be one of the dynamic geps of the same array
+        other = 0
+        for line in chunk:
+            if re.match(rf"^\s*{re.escape(cname)} = ", line):
+                continue
+            m = GEP_DYN.match(line)
+            if m and m.group(4) == cname:
+                continue
+            if cname in line:
+                other += 1
+        if other:
+            bad.add(cname)
+            arrays.pop(arr, None)
+    for line in chunk:
         m = LOAD.match(line)
         if m and m.group(3) in dyn_geps:
             if m.group(3) in load_geps:
                 bad.add(m.group(3))
             else:
-                load_geps[m.group(3)] = i
+                load_geps[m.group(3)] = True
             continue
-        m = STORE.match(line)
-        tgt = m.group(3) if m else None
-        if tgt in dyn_geps:
-            bad.add(tgt)  # dynamic store: not rewritten
-            continue
-        if m and tgt in const_geps:
-            g = const_geps[tgt]
-            if tgt in store_geps:
-                bad.add(tgt)
-            else:
-                store_geps[tgt] = i
-            continue
-        # any other mention of a managed gep or cast name disqualifies it
-        for name in list(dyn_geps) + list(const_geps) + list(casts):
+        if STORE.match(line):
+            continue  # stores to the array or a const gep are always rewritable
+        for name in list(dyn_geps) + list(const_geps):
             if name in line and not re.match(rf"^\s*{re.escape(name)} = ", line):
-                if name in dyn_geps:
-                    bad.add(name)
-                if name in const_geps:
-                    bad.add(name)
-                if name in casts:
-                    bad.add(name)
-    if bad:
-        for name in bad:
-            if name in dyn_geps:
-                arrays.pop(dyn_geps[name][0], None)
+                bad.add(name)
+    for name in bad:
+        if name in dyn_geps:
+            arrays.pop(dyn_geps[name][0], None)
+        elif name in const_geps:
+            arrays.pop(const_geps[name][0], None)
     if not arrays:
         return chunk, 0
 
     seq = 0
     out = []
     changed = 0
-    dead_names = set()
     for line in chunk:
         m = ALLOCA.match(line)
         if m and m.group(2) in arrays:
-            out.append(line)
+            # the original array goes away entirely
             indent, name, slots = m.group(1), m.group(2), arrays[m.group(2)]
             for j in range(slots):
-                out.append(f"{indent}{slot(name, j)} = alloca ptr addrspace(1), align {m.group(4)}\n")
-                out.append(f"{indent}store ptr addrspace(1) null, ptr {slot(name, j)}, align 8\n")
+                out.append(f"{indent}{slot(name, j)} = alloca i64, align 8\n")
+                out.append(f"{indent}store i64 0, ptr {slot(name, j)}, align 8\n")
             changed += 1
             continue
         m = GEP_CONST.match(line)
         if m and m.group(2) in const_geps and const_geps[m.group(2)][0] in arrays:
-            dead_names.add(m.group(2))  # its store is rewritten to the slot
-            continue
+            continue  # its store is rewritten to the slot
         m = GEP_DYN.match(line)
         if m and m.group(2) in dyn_geps and dyn_geps[m.group(2)][0] in arrays:
-            dead_names.add(m.group(2))  # its load is rewritten below
-            continue
+            continue  # its load is rewritten below
         m = CAST.match(line)
         if m and m.group(2) in casts and casts[m.group(2)] in arrays:
-            # kept only if some other line still names it (checked below)
-            out.append(line)
-            continue
+            continue  # dropped; a surviving user is checked after the pass
         m = STORE.match(line)
         if m and m.group(3) in const_geps and const_geps[m.group(3)][0] in arrays:
             arr, j = const_geps[m.group(3)]
-            out.append(f"{m.group(1)}store ptr addrspace(1) {m.group(2)}, ptr {slot(arr, j)}, align {m.group(4)}\n")
+            seq += 1
+            if m.group(2) == "null":
+                out.append(f"{m.group(1)}store i64 0, ptr {slot(arr, j)}, align 8\n")
+            else:
+                out.append(f"{m.group(1)}%psbi{seq} = ptrtoint ptr addrspace(1) {m.group(2)} to i64\n")
+                out.append(f"{m.group(1)}store i64 %psbi{seq}, ptr {slot(arr, j)}, align 8\n")
             changed += 1
             continue
         if m and m.group(3) in arrays:
-            out.append(f"{m.group(1)}store ptr addrspace(1) {m.group(2)}, ptr {slot(m.group(3), 0)}, align {m.group(4)}\n")
+            seq += 1
+            if m.group(2) == "null":
+                out.append(f"{m.group(1)}store i64 0, ptr {slot(m.group(3), 0)}, align 8\n")
+            else:
+                out.append(f"{m.group(1)}%psbi{seq} = ptrtoint ptr addrspace(1) {m.group(2)} to i64\n")
+                out.append(f"{m.group(1)}store i64 %psbi{seq}, ptr {slot(m.group(3), 0)}, align 8\n")
             changed += 1
             continue
         m = LOAD.match(line)
@@ -178,34 +184,22 @@ def rewrite_function(chunk):
             vals = []
             for j in range(slots):
                 seq += 1
-                out.append(f"{indent}%psb{seq} = load ptr addrspace(1), ptr {slot(arr, j)}, align 8\n")
+                out.append(f"{indent}%psb{seq} = load i64, ptr {slot(arr, j)}, align 8\n")
                 vals.append(f"%psb{seq}")
             if slots == 1:
-                out.append(f"{indent}{m.group(2)} = load ptr addrspace(1), ptr {slot(arr, 0)}, align 8\n")
+                out.append(f"{indent}{m.group(2)} = inttoptr i64 {vals[0]} to ptr addrspace(1)\n")
             else:
                 sel = vals[-1]
                 for j in range(slots - 2, -1, -1):
                     seq += 1
                     out.append(f"{indent}%psb{seq}c = icmp eq {idxty} {idx}, {j}\n")
-                    out.append(f"{indent}%psb{seq}s = select i1 %psb{seq}c, ptr addrspace(1) {vals[j]}, ptr addrspace(1) {sel}\n")
+                    out.append(f"{indent}%psb{seq}s = select i1 %psb{seq}c, i64 {vals[j]}, i64 {sel}\n")
                     sel = f"%psb{seq}s"
-                out.append(f"{indent}{m.group(2)} = select i1 %psb{seq}c, ptr addrspace(1) {vals[0]}, ptr addrspace(1) {sel}\n")
+                out.append(f"{indent}{m.group(2)} = inttoptr i64 {sel} to ptr addrspace(1)\n")
             changed += 1
             continue
         out.append(line)
-
-    # drop casts whose only users were the rewritten geps
-    body = "".join(out)
-    final = []
-    for line in out:
-        m = CAST.match(line)
-        if m and m.group(2) in casts and casts[m.group(2)] in arrays:
-            uses = len(re.findall(re.escape(m.group(2)) + r"(?![\w.])", body)) - 1
-            if uses == 0:
-                changed += 1
-                continue
-        final.append(line)
-    return final, changed
+    return out, changed
 
 
 def main():
@@ -231,9 +225,9 @@ def main():
         total += n
     if total:
         path.write_text("".join(out))
-        print(f"psb_promote_ptr_arrays: promoted {total} pointer array(s) in {path}")
+        print(f"psb_promote_ptr_arrays: demoted {total} pointer array(s) in {path}")
     else:
-        print("psb_promote_ptr_arrays: no promotable pointer arrays")
+        print("psb_promote_ptr_arrays: no pointer arrays to demote")
 
 
 if __name__ == "__main__":
