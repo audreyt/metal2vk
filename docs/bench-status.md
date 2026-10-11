@@ -65,16 +65,16 @@ unfused-parity measurement, which is stable (315.5 vs 330.8 us).
 | rt4x2 1024³ | 1076.3 us (1995 GFLOP/s) | 526.0 us | 2.05x | err 1.3e-6 OK |
 | rt4x4 1024³ | 489.6 us (4386 GFLOP/s) | 526.0 us | 0.93x | err 1.3e-6 OK |
 
-Uzu's full `Gemm` has no row. The bench has no driver for it. The clspv stage
-still does not finish (parent slice's open item).
+The bench has no driver for uzu's full `Gemm`. That kernel therefore has no
+row. The clspv stage still does not finish (parent slice's open item).
 
 ## M2 Max comparison (G14C, 2026-10-11)
 
 This compares translated kernels with MLX's own kernels on the same GPU. It is
 not a comparison with native Metal. Both runs used Mesa 26.3.0-devel
 git-6543eeb7df7, kernel 7.1.12, and load average 1.30 at the start. The times
-are the raw rows of pull request 70. The throughput columns are the matching
-values from the same runs' JSON output, `bench/m2v-bench.py`. Every correctness
+are the raw rows of pull request 70. Throughput is from the same runs' JSON
+output, `bench/m2v-bench.py`. Every correctness
 check was OK.
 
 | kernel | run 1 translated / MLX | run 2 translated / MLX | translated throughput, run 1 / run 2 | spread |

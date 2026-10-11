@@ -14,15 +14,15 @@ timed iteration is one dispatch, 500 in total.
 
 What this rules out:
 
-- Code size and instruction cache. Uzu instantiates the k loop for 9 alignment masks, 8 dynamic via
+- Code size and instruction cache. The k loop is instantiated for 9 alignment masks, 8 dynamic via
   `dispatch_gemm_alignment` plus the all-aligned one. Keeping only the aligned copy shrinks the shader 6.6x and changes
   nothing (1421 vs 1439 GFLOP/s).
 - Tile size. 32x32 and 64x64 tie.
 - Spills. 0 spills and 0 scratch in all variants.
 
-What is left: the staging path. Uzu copies A and B tiles global -> threadgroup memory with scalar float loads and stores.
-It then reads each fragment from threadgroup memory per lane (two scalars per lane per 8x8 matrix), with a barrier per k
-step. The register-tiled kernel reads fragments straight from global memory as float2 and has no barrier. The SPIR-V
+What is left: the staging path. The kernel copies A and B tiles global -> threadgroup memory with scalar float loads
+and stores. It then reads each fragment from threadgroup memory per lane (two scalars per lane per 8x8 matrix), with a
+barrier per k step. The register-tiled kernel reads fragments straight from global memory as float2 and has no barrier. The SPIR-V
 also round-trips every fragment through a ushort array (`OpBitcast` to v4ushort and back) because simdgroup_matrix
 copies are lowered to 16-bit moves. The agx compiler appears to remove this (0 scratch) but it has not been checked in the
 ISA.
