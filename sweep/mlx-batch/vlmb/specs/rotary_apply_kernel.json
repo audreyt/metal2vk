@@ -1,0 +1,42 @@
+{
+ "module": "mlx-vlm/mlx_vlm/models/rope_utils.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/models/rope_utils.py:863",
+ "call": "x (1,2,4,32) float32, cos/sin (1,4,16) float32; T=float32, rotary_dim=32, half_split, cos_ndim=3, not sectioned, half cos layout; grid=(128,1,1), threadgroup=(256,1,1); x_out (1,2,4,32)",
+ "inputs": [
+  {
+   "name": "x",
+   "dtype": "float32",
+   "ndim": 4,
+   "size": 256
+  },
+  {
+   "name": "cos",
+   "dtype": "float32",
+   "ndim": 3,
+   "size": 64
+  },
+  {
+   "name": "sin",
+   "dtype": "float32",
+   "ndim": 3,
+   "size": 64
+  }
+ ],
+ "outputs": [
+  "float32"
+ ],
+ "template": [
+  [
+   "T",
+   "float32"
+  ]
+ ],
+ "factory": "_rotary_apply_kernel",
+ "args": [
+  32,
+  "half_split",
+  3,
+  false,
+  "half"
+ ]
+}

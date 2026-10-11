@@ -1,0 +1,79 @@
+{
+ "module": "mlx-vlm/mlx_vlm/turboquant.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/turboquant.py:1744",
+ "call": "multi-query: q_rot/q_proj (2,2,64) float16, key_norms/key_res_norms (1,1,2) float16, key_mse (1,1,2,8) uint32, key_signs (1,1,2,2) uint32, codebook (16) float32, scale (1) float32; Dim=64,KMsePackedWidth=8,KSignPackedWidth=2; grid=(32,2,2), threadgroup=(32,1,1); out (2,2,2) float32",
+ "inputs": [
+  {
+   "name": "q_rot",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 256
+  },
+  {
+   "name": "q_proj",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 256
+  },
+  {
+   "name": "key_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "key_mse",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 16
+  },
+  {
+   "name": "key_res_norms",
+   "dtype": "float16",
+   "ndim": 3,
+   "size": 2
+  },
+  {
+   "name": "key_signs",
+   "dtype": "uint32",
+   "ndim": 4,
+   "size": 4
+  },
+  {
+   "name": "key_codebook",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 16
+  },
+  {
+   "name": "key_scale",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 1
+  }
+ ],
+ "outputs": [
+  "float32"
+ ],
+ "template": [
+  [
+   "Dim",
+   64
+  ],
+  [
+   "KMsePackedWidth",
+   8
+  ],
+  [
+   "KSignPackedWidth",
+   2
+  ]
+ ],
+ "factory": "_multi_query_prod_score_kernel",
+ "args": [
+  4,
+  2,
+  2,
+  2
+ ]
+}

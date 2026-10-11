@@ -1,0 +1,36 @@
+{
+ "module": "mlx-vlm/mlx_vlm/turboquant.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/turboquant.py:2889",
+ "call": "no-rotation quantize: rotated (1,64) float16, midpoints (15) float32; Dim=64,PackedWidth=2; grid=(64,1,1), threadgroup=(64,1,1); out (1,2) uint32",
+ "inputs": [
+  {
+   "name": "rotated",
+   "dtype": "float16",
+   "ndim": 2,
+   "size": 64
+  },
+  {
+   "name": "midpoints",
+   "dtype": "float32",
+   "ndim": 1,
+   "size": 15
+  }
+ ],
+ "outputs": [
+  "uint32"
+ ],
+ "template": [
+  [
+   "Dim",
+   64
+  ],
+  [
+   "PackedWidth",
+   2
+  ]
+ ],
+ "factory": "_fused_norot_quantize_kernel",
+ "args": [
+  4
+ ]
+}

@@ -1,0 +1,48 @@
+{
+ "module": "mlx-vlm/mlx_vlm/models/qwen3_5/language.py",
+ "origin": "mlx-vlm@8f5dc3d, mlx_vlm/models/qwen3_5/language.py:596",
+ "call": "decode two-pass 2: partials (1,2,1,8,64) float16, sums/maxs (1,2,1,8) float32; T=float16,D_SIZE=64,BLOCKS=8; grid=(1024,2,1), threadgroup=(1024,1,1); out (1,2,1,64)",
+ "inputs": [
+  {
+   "name": "partials",
+   "dtype": "float16",
+   "ndim": 5,
+   "size": 1024
+  },
+  {
+   "name": "sums",
+   "dtype": "float32",
+   "ndim": 4,
+   "size": 16
+  },
+  {
+   "name": "maxs",
+   "dtype": "float32",
+   "ndim": 4,
+   "size": 16
+  }
+ ],
+ "outputs": [
+  "float16"
+ ],
+ "template": [
+  [
+   "T",
+   "float16"
+  ],
+  [
+   "D_SIZE",
+   64
+  ],
+  [
+   "BLOCKS",
+   8
+  ]
+ ],
+ "factory": "_qwen3_5_ragged_sdpa_two_pass_2_kernel",
+ "args": [
+  "float16",
+  64,
+  8
+ ]
+}
