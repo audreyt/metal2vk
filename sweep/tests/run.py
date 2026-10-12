@@ -11,11 +11,6 @@ a float phi, or leaves a bfloat token behind. The dynamic array case fails if th
 the single-member wrapper that clspv cannot lower. The pointer-phi case fails if the pass leaves a loop-carried
 pointer phi (clspv's SimplifyPointerBitcast cycles on those and the patched pass then drifts the loop-exit tail,
 PR #47) or gets the byte steps wrong; the skip case fails if it rewrites a dynamic-stride phi it cannot prove.
-The guarded-workgroup-load case is the nvfp4 argmax shape (sweep/mlx-batch/vlmb/repro/): clspv's optimiser
-speculates the guarded addrspace(3) load into a select over differently-typed workgroup pointers and the
-producer emits an ill-typed OpSelect, so the pass must hoist the load into the branch block and select values
-before clspv runs. The volatile sibling fails if the pass rewrites a `load volatile` from Workgroup memory:
-a speculated volatile load changes observable behaviour, so the diamond must survive untouched.
 When PARITY_G7_DEC (or BLEND_TOOLS) points at saved sweep data, the pointer-phi case also rewrites the real
 gate_up decode IR and requires clspv to compile it with no give-up diagnostic.
 """
