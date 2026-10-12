@@ -2,10 +2,12 @@
 """Compare native Metal timings (macOS JSONs) with translated bench timings (Linux JSONs).
 
 Both sides must be the same chip, cover the same cases, and pass their checks;
-otherwise the tool refuses (exit 1) and prints no table. Prints the chip, macOS
-version and the Linux kernel, Mesa git driver, CPU governor and ANE state when
-the Linux JSONs or --meta KEY=VALUE flags supply them, plus a loud warning when
-any recorded load average exceeds 0.5.
+otherwise the tool refuses (exit 1) and prints no table. Both sides are wall
+per dispatch; the ratio uses native effective (wall) us, and native GPU us is
+shown in a separate context column. Prints the chip, macOS version and the
+Linux kernel, Mesa git driver, CPU governor and ANE state when the Linux JSONs
+or --meta KEY=VALUE flags supply them, plus a loud warning when any recorded
+load average exceeds 0.5.
 
 Native side:   bench/native-metal results-native-metal-YYYY-MM-DD.json
                (needs "device" (chip) and "load"; number or [1, 5, 15] minutes;
@@ -60,9 +62,10 @@ def load1(v):
 
 
 def side(paths, kind, overrides):
-    """(chip, docs, per-case us lists) for one side; enforces the shared refusals.
+    """(chip, docs, per-case time lists) for one side; enforces the shared refusals.
     overrides are header fields (e.g. from --native-meta/--native-load) applied
-    over each document before the checks."""
+    over each document before the checks. times[case] holds "wall" for both
+    sides (us is wall per dispatch on both) and "gpu" for the native side."""
     docs = [read_doc(p) for p in paths]
     for d in docs:
         d.update(overrides)
@@ -74,12 +77,13 @@ def side(paths, kind, overrides):
         for case, row in d["rows"].items():
             if row.get("ok") is not True:
                 fail(f"{kind} file {p}: case {case} check is not OK")
-            us = row.get("gpu_us") if kind == "macOS" else None
-            if us is None:
-                us = row.get("us")
-            if not isinstance(us, (int, float)):
-                fail(f"{kind} file {p}: case {case} has no us/gpu_us time")
-            times.setdefault(case, []).append(float(us))
+            wall = row.get("us")
+            if not isinstance(wall, (int, float)):
+                fail(f"{kind} file {p}: case {case} has no wall us")
+            entry = times.setdefault(case, {"wall": [], "gpu": []})
+            entry["wall"].append(float(wall))
+            if kind == "macOS" and isinstance(row.get("gpu_us"), (int, float)):
+                entry["gpu"].append(float(row["gpu_us"]))
     return chips.pop(), docs, times
 
 
@@ -153,6 +157,8 @@ def main():
                        ("CPU governor", "governor"), ("ANE state", "ane")):
         print(f"# {label}: {hdr.get(key) or '(not recorded)'}")
     print(f"# runs: native {len(ndocs)} | linux {len(ldocs)}")
+    print("# basis: wall per dispatch on both sides (native effective us vs translated us); "
+          "native GPU us is context only")
     hot = [(s, v) for s, v in loads if v > LOAD_LIMIT]
     if hot:
         detail = " | ".join(f"{s} {v:.2f}" for s, v in loads)
@@ -161,20 +167,25 @@ def main():
     else:
         print(f"# load: all recorded loads at or below {LOAD_LIMIT}")
 
-    print("| case | native GPU us | native spread | translated us | translated spread "
-          "| translated/native | MLX hand us |")
-    print("|---|---|---|---|---|---|---|")
+    print("| case | native wall us | native spread | translated us | translated spread "
+          "| translated/native | native GPU us (context) | MLX hand us |")
+    print("|---|---|---|---|---|---|---|---|")
     for case in sorted(ntimes, key=lambda c: (CASES.index(c) if c in CASES else len(CASES), c)):
-        nmed, lmed = statistics.median(ntimes[case]), statistics.median(ltimes[case])
+        walls, gpus = ntimes[case]["wall"], ntimes[case]["gpu"]
+        nmed, lmed = statistics.median(walls), statistics.median(ltimes[case]["wall"])
         hand = ldocs[0]["rows"][case].get("hand") or {}
         fused = (hand.get("fused") or {}).get("us")
         unfused = (hand.get("unfused") or {}).get("us")
         ctx = "-"
         if fused is not None:
             ctx = fmt(fused) + (f"/{fmt(unfused)}" if unfused is not None else "")
+        gpu_cell = "-"
+        if gpus:
+            gpu_cell = f"{fmt(statistics.median(gpus))} ({fmt(max(gpus) - min(gpus))})"
         ratio = f"{lmed / nmed:.2f}" if nmed else "n/a"
-        print(f"| {case} | {fmt(nmed)} | {fmt(max(ntimes[case]) - min(ntimes[case]))} "
-              f"| {fmt(lmed)} | {fmt(max(ltimes[case]) - min(ltimes[case]))} | {ratio} | {ctx} |")
+        print(f"| {case} | {fmt(nmed)} | {fmt(max(walls) - min(walls))} "
+              f"| {fmt(lmed)} | {fmt(max(ltimes[case]['wall']) - min(ltimes[case]['wall']))} "
+              f"| {ratio} | {gpu_cell} | {ctx} |")
 
 
 if __name__ == "__main__":

@@ -33,7 +33,7 @@ The native row names match the translated JSON keys: `activation_f32`, `activati
 
 ## Pair with a Linux run
 
-`compare.py` prints the first translated-vs-native table for one chip. It reads one or more native JSONs and one or more translated JSONs. Per case it reports the median and the spread (max minus min) over the runs. The columns are native GPU us, translated us, the translated/native ratio, and the MLX hand-kernel time for context. It refuses, with a message and a nonzero exit, on any of these: chips that differ, a case on one side only, a check that is not `OK`, a native JSON without a `load` or `device` field. `--native-load` supplies the macOS load1 the window logged, and `--native-meta chip=... macos=... thermal=...` supplies or overrides the native header fields; a missing `load` is fatal only when neither the JSON nor `--native-load` has it. It prints a loud `WARNING` line when a recorded load average is above 0.5 on either side.
+`compare.py` prints the first translated-vs-native table for one chip. It reads one or more native JSONs and one or more translated JSONs. Per case it reports the median and the spread (max minus min) over the runs. Both sides are wall per dispatch: the columns are native wall us, translated us, the translated/native ratio on that same wall basis, native GPU us (context only), and the MLX hand-kernel time. On the activation kernel the native wall and GPU times sit far apart, so the basis matters. It refuses, with a message and a nonzero exit, on any of these: chips that differ, a case on one side only, a check that is not `OK`, a native JSON without a `load` or `device` field. `--native-load` supplies the macOS load1 the window logged, and `--native-meta chip=... macos=... thermal=...` supplies or overrides the native header fields; a missing `load` is fatal only when neither the JSON nor `--native-load` has it. It prints a loud `WARNING` line when a recorded load average is above 0.5 on either side.
 
 One chip means one host on each side: for example the 16-inch M1 Max (native, macOS) against the same 16-inch M1 Max running Linux, or the 14-inch M2 Max (native, macOS) against the g14c translated runs. The native run of 2026-10-11 and the g14c runs of the same date are different chips and must never be compared. No Mac Studio number exists and none is planned; the Studio served only the build smoke test.
 
@@ -52,9 +52,11 @@ Linux side (14-inch M2 Max), same quiet discipline, one governor for the whole s
 
 ```sh
 cat /sys/devices/system/cpu/cpufreq/policy0/scaling_governor
-mesa-git-sha
-bash bench/run-all.sh /tmp/m2v-out --device g14c
+cat "$(dirname "$M2V_ICD")/mesa-git-sha"
+PATH=$HOME/bin:$PATH <gpu-queue-wrapper> -m 25 -- bash bench/run-all.sh /tmp/m2v-out --device g14c
 ```
+
+The ICD directory holds `mesa-git-sha` next to the driver library and the ICD JSON. The queue wrapper caps the run; the repo's `docs/bench-status.md` documents the form.
 
 Then, from `bench/native-metal/`:
 
@@ -63,7 +65,8 @@ python3 compare.py \
   --native results/native-run1.json results/native-run2.json results/native-run3.json \
   --linux ../results-<device>-<date>.json \
   --native-load 0.12 --native-meta thermal="Nominal" \
-  --meta kernel=$(uname -r) --meta driver=$(mesa-git-sha) \
+  --meta kernel=$(uname -r) \
+  --meta driver=$(cat "$(dirname "$M2V_ICD")/mesa-git-sha") \
   --meta governor=performance --meta ane=idle --meta load=0.12
 ```
 

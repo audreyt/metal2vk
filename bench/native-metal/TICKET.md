@@ -10,13 +10,12 @@ No table gets published from a mixed pair.
 ## macOS window A: 16-inch M1 Max
 
 The lab pane boots this Mac into macOS on AC power.
-Work over `ssh 16m1mbp-macos`.
+Work in a shell on the 16-inch M1 Max (macOS side).
 After boot, touch nothing for 5 minutes.
 A run started seconds after boot lands on load above 10.
 Those numbers are unusable.
 
 ```sh
-ssh 16m1mbp-macos
 git clone https://github.com/joshuaswarren/metal2vk.git
 cd metal2vk/bench/native-metal
 
@@ -57,12 +56,11 @@ Send back:
 ## macOS window B: 13-inch M1
 
 Same steps as window A. The lab pane boots this Mac into macOS on AC power.
-Work over `ssh jw-m1-lan`.
+Work in a shell on the 13-inch M1 (macOS side).
 This Mac has 16 GB of memory; the harness run is small.
 No big model, no swap pressure; the whole harness fits in memory.
 
 ```sh
-ssh jw-m1-lan
 git clone https://github.com/joshuaswarren/metal2vk.git
 cd metal2vk/bench/native-metal
 
@@ -91,33 +89,37 @@ Send back the same file set as window A.
 
 ## Linux side: 14-inch M2 Max
 
+Work in a shell on the 14-inch M2 Max, in a checkout of the repo (clone it as in window A if needed).
+
 ```sh
-ssh jw14m2-linux
-cd ~/src/metal2vk-ggmlsweep          # or clone the repo as in window A
+cd metal2vk-ggmlsweep
 git rev-parse HEAD > commit.txt
 
 # 1. name the governor and driver BEFORE the runs
 cat /sys/devices/system/cpu/cpufreq/policy0/scaling_governor > governor.txt
 cat governor.txt
-mesa-git-sha > mesa-git.txt
+cat "$(dirname "$M2V_ICD")/mesa-git-sha" > mesa-git.txt
 cat mesa-git.txt
 uname -r > kernel.txt
 uptime > load-before.txt
 
-# 2. one run. Needs UZU_ROOT, CLSPV, M2V_ICD. See bench/env-local.sh.template.
-bash bench/run-all.sh /tmp/m2v-out --device g14c 2>&1 | tee linux-run1.txt
+# 2. two back-to-back runs. Needs UZU_ROOT, CLSPV, M2V_ICD.
+#    See bench/env-local.sh.template. The queue wrapper caps the run at 25 minutes.
+PATH=$HOME/bin:$PATH <gpu-queue-wrapper> -m 25 -- bash bench/run-all.sh /tmp/m2v-out --device g14c 2>&1 | tee linux-run1.txt
 cp bench/results-g14c-*.json bench/linux-run1.json
+PATH=$HOME/bin:$PATH <gpu-queue-wrapper> -m 25 -- bash bench/run-all.sh /tmp/m2v-out --device g14c 2>&1 | tee linux-run2.txt
+cp bench/results-g14c-*.json bench/linux-run2.json
 ```
 
 The run takes a few minutes.
 `run-all.sh` compiles the cases, then runs the bench, then the sweep.
 The receipts land in `bench/` as `results-g14c-YYYY-MM-DD.json`.
-The dated name overwrites. Rename it for each extra run.
-Two or three back-to-back runs give the Linux side a median and a spread too.
+The dated name overwrites. The ticket above renames each run into `bench/linux-run1.json` and `bench/linux-run2.json`.
+Two back-to-back runs give the Linux side a median and a spread.
 Keep the machine quiet. Keep one governor for every run.
 Never mix governors in one comparison.
 
-Send back: the results JSONs, `governor.txt`, `mesa-git.txt`, `kernel.txt`, `load-before.txt`, `linux-run1.txt`, `commit.txt`.
+Send back: the two results JSONs, `governor.txt`, `mesa-git.txt`, `kernel.txt`, `load-before.txt`, `linux-run1.txt`, `linux-run2.txt`, `commit.txt`.
 
 ## Pairing them
 

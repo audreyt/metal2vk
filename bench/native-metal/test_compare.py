@@ -14,12 +14,12 @@ CASES = [
 ]
 
 
-def native_doc(chip="Apple M2 Max", load=0.1, ok=True, drop=(), gpu_us=100.0):
+def native_doc(chip="Apple M2 Max", load=0.1, ok=True, drop=(), us=100.0, gpu_us=46.5):
     rows = {}
     for c in CASES:
         if c in drop:
             continue
-        rows[c] = {"us": gpu_us + 1, "gpu_us": gpu_us, "iters": 500,
+        rows[c] = {"us": us, "gpu_us": gpu_us, "iters": 500,
                    "err": 1e-7, "tol": 1e-5, "ok": ok, "metric": "GFLOPs", "value": 1000.0}
     return {"date": "2026-10-12", "device": chip, "macos": "Version 26.6.2 (Build 25G83)",
             "load": load, "rows": rows}
@@ -60,13 +60,14 @@ class CompareTest(unittest.TestCase):
             capture_output=True, text=True)
 
     def test_median_ratio_and_header(self):
-        nat = [self.write(f"n{i}.json", native_doc(gpu_us=100.0 * (i + 1))) for i in range(3)]
+        nat = [self.write(f"n{i}.json", native_doc(us=100.0 * (i + 1), gpu_us=46.5))
+               for i in range(3)]
         lin = [self.write(f"l{i}.json", linux_doc(us=50.0 + 25.0 * i)) for i in range(3)]
         r = self.run_compare(nat, lin, meta=["kernel=7.1.12-2-11.38-sep-ARCH",
                                             "driver=69bde15340", "governor=performance", "ane=idle"])
         self.assertEqual(r.returncode, 0, r.stderr)
-        # medians: native GPU 200.0 us, translated 75.0 us, ratio 0.38; spreads 200.0 / 50.0
-        for want in ["200.0", "75.0", "0.38", "41.1/82.2"]:
+        # medians: native WALL 200.0 us (not GPU 46.5), translated 75.0 us, ratio 0.38
+        for want in ["200.0", "75.0", "0.38", "41.1/82.2", "46.5 (0.0)", "wall"]:
             self.assertIn(want, r.stdout)
         self.assertIn("Apple M2 Max", r.stdout)
         self.assertIn("69bde15340", r.stdout)
@@ -129,6 +130,17 @@ class CompareTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("WARNING", r.stdout)
         self.assertIn("2.1", r.stdout)
+
+    def test_ratio_uses_wall_not_gpu(self):
+        """w7K review: both sides are wall per dispatch; native GPU us is context only."""
+        nat = [self.write(f"n{i}.json", native_doc(us=100.0 * (i + 1), gpu_us=46.5))
+               for i in range(3)]
+        lin = [self.write(f"l{i}.json", linux_doc(us=50.0 + 25.0 * i)) for i in range(3)]
+        r = self.run_compare(nat, lin)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("0.38", r.stdout)     # 75/200 wall-based
+        self.assertNotIn("1.61", r.stdout)  # 75/46.5 would be the wrong (GPU) basis
+        self.assertIn("native GPU us", r.stdout)  # separate context column
 
     def test_native_load_flag_supplies_missing_load(self):
         doc = native_doc()
