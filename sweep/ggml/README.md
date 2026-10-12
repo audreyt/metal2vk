@@ -109,12 +109,14 @@ class is now small enough to fix in its own PR:
    - 43 `invalid LLVM IR input: Instruction does not dominate all uses!`.
      The IR-shape bug the baseline already ranked on `kernel_soft_max_f32`
      and neighbours; the matmul inner loops' B-tile load is non-dominating.
-   - 26 `OpPtrAccessChain result type ... does not match` (the
-     `line NNNN:` spirv-val-format error, emitted by clspv when the typed
-     GEP / pointer-shape pass rejects a struct-typed access). Concentrated
-     in the `mul_mm_id` quant variants for `iq{1_s,2_s,2_xs,2_xxs,3_s,3_xxs,
-     4_xs}` and `q{1_0,2_0,3_K,6_K}` / `tq2_0`. Compile produces a
-     `compile=ok, spirv_val=fail` row.
+   - 26 SPIR-V validation failures: 24 report
+     `OpPtrAccessChain result type ... does not match`; the two
+     `kernel_mul_mm_id_iq1_m_f{16,32}` entries report
+     `OpAccessChain reached non-composite type while indexes still remain to be traversed.`
+     The affected `mul_mm_id` quant variants are
+     `iq{1_s,1_m,2_s,2_xs,2_xxs,3_s,3_xxs,4_xs}`,
+     `q{1_0,2_0,3_K,6_K}`, and `tq2_0`. Each row has
+     `compile=ok, spirv_val=fail`.
    - 22 (`9 at 12:1 + 6 at 14:1 + 3 at 13:1 + 2 at 15:1 + 2 at 11:1`)
      `forward references to non-struct type`. A clang ordering edge in
      the rewriter output.
