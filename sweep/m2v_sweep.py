@@ -502,6 +502,13 @@ def tparam_names(inner):
     for p in split_top(inner):
         p = re.sub(r"=.*$", "", p.strip())
         m = re.search(r"(\w+)\s*$", p)
+        if m:
+            names.append(m.group(1))
+            continue
+        # function-pointer template param (e.g. `void (*dequantize_func)(device const block_q *, short, thread SA_4x4 &)`):
+        # the trailing word of the param is the last type identifier, not the declarator. Without the body subst missing
+        # the name, ggml's mul_mm / mul_mv_mma / fa_aux instantiations fail on `use of undeclared identifier 'name'`.
+        m = re.search(r"\(\s*\*\s*(\w+)\s*\)\s*\(", p)
         names.append(m.group(1) if m else p)
     return names
 
