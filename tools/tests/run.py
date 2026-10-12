@@ -16,7 +16,7 @@ entry 5, and every module must be byte-identical to the sweep's.
 import json
 import os
 import pathlib
-import shutil
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -67,6 +67,35 @@ template [[host_name("tensorish")]] [[kernel]] decltype(tensorish<2>) tensorish<
 
 BROKEN = "kernel void broken( uninitialized ) {\n"
 
+# The ggml corpus staging path on the shim's metal::matrix: column subscript, device -> thread
+# copy, matrix-to-matrix cast (narrow and bfloat widen), scalar multiply on both sides, and a
+# threadgroup array of matrices. Before the matrix types landed (aee0a1d) this fails at parse
+# with `unknown type name 'float4x4'`; it must stay a full-pipeline check (clang -> opt -> clspv
+# -> spirv-val), not a source-text assertion.
+MATRIX = """\
+#include <metal_stdlib>
+using namespace metal;
+
+kernel void matrix_cols(device const char* src [[buffer(0)]],
+                        device float* out [[buffer(1)]],
+                        uint tid [[thread_position_in_grid]]) {
+  threadgroup float4x4 tile[2];
+  float4x4 a;
+  a[0][0] = 1.0f;
+  a[1] = float4(2.0f);
+  device const float4x4* dp = (device const float4x4*)(src);
+  float4x4 b = *dp;
+  half4x4 h = (half4x4)b;
+  bfloat4x4 bf;
+  bf[0][0] = bfloat(1.5f);
+  float4x4 f = (float4x4)bf;
+  float4x4 s = b * 2.0f;
+  float4x4 s2 = 0.5f * b;
+  tile[tid % 2u] = b;
+  out[tid] = dot(s[3], tile[tid % 2u][0]) + (float)f[0][0] + (float)s[1][2] + (float)s2[2][1];
+}
+"""
+
 fails = 0
 
 
@@ -91,12 +120,16 @@ def run(msl, out, cache, name=None, as_json=True):
 
 
 def main():
+    tparam_names = runpy.run_path(str(REPO / "sweep" / "m2v_sweep.py"))["tparam_names"]
+    check(tparam_names("void (*dequantize_func)(device const void *, short, thread SA_4x4 &)")
+          == ["dequantize_func"], "function-pointer template parameter keeps its declarator name")
+    check(tparam_names("typename T, int N") == ["T", "N"], "ordinary template parameter names stay intact")
     with tempfile.TemporaryDirectory(prefix="m2v-cli-test-") as td:
         root = pathlib.Path(td)
         src = root / "msl"
         src.mkdir()
         for n, text in (("plain.metal", PLAIN), ("template.metal", TEMPLATE), ("refused.metal", REFUSED),
-                        ("broken.metal", BROKEN)):
+                        ("broken.metal", BROKEN), ("matrix.metal", MATRIX)):
             (src / n).write_text(text)
         cache = root / "cache"
         out = root / "out"
@@ -134,6 +167,13 @@ def main():
         (src / "plain.metal").write_text(PLAIN.replace("* scale + 1.0f", "* scale + 2.0f"))
         rc, so, se, line = run(src / "plain.metal", out, cache)
         check(rc == 0 and line["cache"] == "miss", "changed MSL text is a new key")
+
+        # matrix staging path (the ggml corpus shape): column subscript, device -> thread copy,
+        # matrix-to-matrix casts, scalar multiply on both sides, threadgroup array of matrices.
+        # Fails at parse on the pre-matrix shim (aee0a1d): unknown type name 'float4x4'.
+        rc, so, se, line = run(src / "matrix.metal", out, cache)
+        check(rc == 0 and bool(line) and line.get("status") == "ok", "matrix staging kernel compiles to valid SPIR-V")
+        check(bool(line) and line.get("name") == "matrix_cols", "matrix kernel reflection names matrix_cols")
 
         # name selection: template kernel with two instantiations
         rc, so, se, line = run(src / "template.metal", out, cache)
