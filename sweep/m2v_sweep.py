@@ -306,6 +306,26 @@ BUILTIN_TYPES = {"char", "uchar", "short", "ushort", "int", "uint", "long", "ulo
                  "size_t", "ptrdiff_t"}
 
 
+FUNCTION_CONSTANT_UNINIT = re.compile(r"\bconstant\s+([\w:]+)\s+(\w+)\s*(\[\[\s*function_constant\s*\([^)]*\)\s*\]\])\s*;")
+DOT_DEF = re.compile(r"\b(static\s+inline\s+[\w:\s]+?)\bdot(\s*\()")
+
+
+def function_constant_defaults(text):
+    """Metal lets a `[[function_constant(N)]]` program-scope constant omit the initializer (the type's zero is the
+    default; ggml's kernels do); OpenCL requires one. Give the declaration Metal's default, index untouched."""
+    zero = {"bool": "false", "float": "0.0f", "half": "0.0h", "bfloat": "0.0h"}
+    return FUNCTION_CONSTANT_UNINIT.sub(
+        lambda m: "constant %s %s %s = %s;" % (m.group(1), m.group(2), m.group(3), zero.get(m.group(1), "0")),
+        text)
+
+
+def builtin_collisions(text):
+    """A source-defined `static inline float dot(float, float)` (Metal has no scalar dot; ggml's common.h defines one)
+    redeclares OpenCL's non-static builtin of the same signature, which C++ for OpenCL refuses. Rename the definition
+    only: its call sites then bind the builtin, which for scalars is exactly x*y, and vector dot calls are untouched."""
+    return DOT_DEF.sub(lambda m: m.group(1) + "m2v_dot" + m.group(2), text)
+
+
 def program_const_values(text):
     """A program-scope `constant constexpr Struct NAME = {...};` (TensorFold's sampling constants) cannot be passed by
     value: the class copy constructor takes an unqualified reference and a __constant lvalue cannot bind to it. Turn
@@ -487,7 +507,7 @@ def tparam_names(inner):
 
 
 HOST_RE = re.compile(r"\btemplate\s*\[\[\s*host_name\s*\(\s*((?:\"[^\"]*\"\s*)+)\)\s*\]\]\s*(?:\[\[\s*kernel\s*\]\]|\bkernel\b)\s*"
-                     r"(?:decltype\s*\(\s*(\w+)\s*<|void\s+(\w+)\s*<)")
+                     r"(?:decltype\s*\(\s*(\w+)\s*<|void\s+(\w+)\s*<|(\w+)\s+(\w+)\s*<)")
 
 
 DSL_KERNEL_RE = re.compile(r'\[\[\s*clang::annotate\(\s*""\s*,\s*"dsl\.kernel"\s*\)\s*\]\]\s*void\s+(\w+)\s*\(')
@@ -536,7 +556,7 @@ def find_entries(text):
     for e in entries:
         byname.setdefault(e["name"], []).append(e)
     for m in HOST_RE.finditer(text):
-        name = m.group(2) or m.group(3)
+        name = m.group(2) or m.group(3) or m.group(5)
         lt = m.end() - 1
         gt = balanced(text, lt, "<", ">")
         end = text.find(";", gt)
@@ -861,6 +881,12 @@ def build_inplace(text0, blanked, entry, kname, targs, others):
     edits = [(own, b1 + 1, kern)]
     for i in entry["inst"]:
         edits.append((i["span"][0], i["span"][1], ""))
+    tmpl_names = {o["name"] for o in others if o["tmpl"]} | ({entry["name"]} if th else set())
+    for m in re.finditer(r"\btypedef\s+decltype\s*\(\s*(\w+)\s*<", text0):
+        if m.group(1) in tmpl_names:  # the alias only carried the instantiation's kernel type; the
+            lt = m.end() - 1          # concrete __kernel has the host name, so the decltype's
+            gt = balanced(text0, lt, "<", ">")  # template reference would be undeclared now
+            edits.append((m.start(), text0.find(";", gt) + 1, ""))
     for o in others:
         oth = o["tmpl"]
         st = oth[0] if oth else attr_run_start(text0, o["head"][0])
@@ -1584,7 +1610,7 @@ def process_once(setname, src_path, rel, eidx, kname, targs, outdir, include_dir
     if mentions_mpp(src_path, include_dirs):
         pre += '#include "MetalPerformancePrimitives/MetalPerformancePrimitives.h"\n'
     cl.write_text(pre + VEC_ALIASES + class_conditional_operands(program_const_values(identity_deduction(vec_ctor_calls(
-        uzu_compat(norm_decls(strip_annotate(src))))))) + '\n#line 1 "m2v-wrapper"\n' + wsrc)
+        uzu_compat(builtin_collisions(function_constant_defaults(norm_decls(strip_annotate(src))))))))) + '\n#line 1 "m2v-wrapper"\n' + wsrc)
     ll = d / "ll" / (tag + ".ll")
     ll.parent.mkdir(parents=True, exist_ok=True)
     cmd = [CLANG, "--target=" + ("spir64" if psb_case(tag) else "spir"), "-x", "cl", "-cl-std=clc++2021", "-Xclang", "-finclude-default-header",
