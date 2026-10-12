@@ -134,6 +134,14 @@ def run(msl, out, cache, name=None, as_json=True):
 
 
 def main():
+    corpus = runpy.run_path(str(REPO / "sweep" / "mlx-core" / "mlx_core_run.py"))
+    diagnostic = ("/private/cache/kernels/attention.h:12:7: error: invalid vector element type 'bool'"
+                  " | /private/cache/context.h:4:1: note: instantiated here")
+    check(corpus["scrub_diag"](diagnostic)
+          == "attention.h:12:7: invalid vector element type 'bool'",
+          "corpus diagnostic keeps the error and removes private paths and continuation")
+    check(corpus["classify"](4, "error", diagnostic, "") == "shim_gap",
+          "invalid bool vector reports a shim gap")
     tparam_names = runpy.run_path(str(REPO / "sweep" / "m2v_sweep.py"))["tparam_names"]
     check(tparam_names("void (*dequantize_func)(device const void *, short, thread SA_4x4 &)")
           == ["dequantize_func"], "function-pointer template parameter keeps its declarator name")
