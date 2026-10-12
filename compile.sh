@@ -71,8 +71,9 @@ for c in $CASES; do
   # a guarded load from a workgroup array feeding a join phi is speculated by clspv's optimiser
   # into a select over differently-typed workgroup pointers, which the producer emits as an
   # ill-typed OpSelect that spirv-val rejects (the nvfp4 argmax shape); hoist the load into the
-  # branch block and select values first (no-op otherwise)
-  grep -q 'load .*ptr addrspace(3)' "$OUT/$c.ll" && python3 "$H/sweep/guarded_wg_load_select.py" "$OUT/$c.ll" || true
+  # branch block and select values first (no-op otherwise; M2V_KEEP_WG_GUARD=1 skips the pass,
+  # as in sweep/m2v_sweep.py)
+  [ "${M2V_KEEP_WG_GUARD:-}" = 1 ] || { grep -q 'load .*ptr addrspace(3)' "$OUT/$c.ll" && python3 "$H/sweep/guarded_wg_load_select.py" "$OUT/$c.ll" || true; }
   PSB_FLAGS=$( [ "$PSB" = 1 ] && echo "--arch=spir64 --physical-storage-buffers" || true )
   # shellcheck disable=SC2086
   "$CLSPV" -x ir --cl-std=CLC++2021 --fp16 --inline-entry-points --spv-version=1.5 --long-vector $PSB_FLAGS "$OUT/$c.ll" -o "$OUT/$c.spv" > "$OUT/$c.clspv.log" 2>&1

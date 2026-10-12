@@ -14,7 +14,9 @@ matrix validates (v7/v10/v15/v17/v18) and keeps the pointer selects clspv sees s
 Safety: the pass only fires on diamonds whose guarded block holds nothing but addrspace(3) GEPs
 and loads, whose join has exactly the two diamond predecessors, and whose condition is defined in
 the branch block - the speculative read is one clspv's own optimiser would have executed anyway on
-the unrewritten module (it is what built the bad select). A module without the shape is a no-op.
+the unrewritten module (it is what built the bad select). Volatile loads never match: hoisting
+one would execute it on every iteration and fold it into a select, changing observable behaviour
+(sweep/tests/wg_volatile_skip.ll pins that). A module without the shape is a no-op.
 """
 import pathlib
 import re
@@ -22,7 +24,7 @@ import sys
 
 LABEL = re.compile(r"^([\w.$-]+):(.*)$")
 GEP_WG = re.compile(r"^(\s*)(%[\w.$]+) = getelementptr .*, ptr addrspace\(3\) (%[\w.$]+|@[\w.$]+),")
-LOAD_WG = re.compile(r"^(\s*)(%[\w.$]+) = load [\w ]+, ptr addrspace\(3\) (%[\w.$]+|@[\w.$]+)[,.]")
+LOAD_WG = re.compile(r"^(\s*)(%[\w.$]+) = load (?!volatile )[\w ]+, ptr addrspace\(3\) (%[\w.$]+|@[\w.$]+)[,.]")
 COND_BR = re.compile(r"^(\s*)br i1 (%[\w.$]+), label %([\w.$-]+), label %([\w.$-]+)(\s*)$")
 PLAIN_BR = re.compile(r"^(\s*)br label %([\w.$-]+)\s*$")
 PHI = re.compile(r"^(\s*)(%[\w.$]+) = phi (.+?) ((?:\[[^\]]*\](?:,\s*)?)+)\s*$")
