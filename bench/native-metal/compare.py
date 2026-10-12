@@ -8,7 +8,8 @@ the Linux JSONs or --meta KEY=VALUE flags supply them, plus a loud warning when
 any recorded load average exceeds 0.5.
 
 Native side:   bench/native-metal results-native-metal-YYYY-MM-DD.json
-               (needs "device" (chip) and "load"; number or [1, 5, 15] minutes)
+               (needs "device" (chip) and "load"; number or [1, 5, 15] minutes;
+               --native-load / --native-meta supply or override them)
 Translated:    bench/results-<device>-<date>.json from bench/m2v-bench.py
 
 Stdlib only.
@@ -58,9 +59,13 @@ def load1(v):
     return float(str(v).strip("{} ").split()[0])
 
 
-def side(paths, kind):
-    """(chip, docs, per-case us lists) for one side; enforces the shared refusals."""
+def side(paths, kind, overrides):
+    """(chip, docs, per-case us lists) for one side; enforces the shared refusals.
+    overrides are header fields (e.g. from --native-meta/--native-load) applied
+    over each document before the checks."""
     docs = [read_doc(p) for p in paths]
+    for d in docs:
+        d.update(overrides)
     chips = {chip_of(d) for d in docs}
     if len(chips) != 1 or not next(iter(chips)):
         fail(f"{kind} files disagree on chip or name none: {sorted(chips)} ({', '.join(paths)})")
@@ -88,6 +93,11 @@ def main():
                     help="translated bench result JSON(s), Linux side")
     ap.add_argument("--meta", action="append", default=[], metavar="KEY=VALUE",
                     help="Linux-side header field, e.g. --meta governor=performance")
+    ap.add_argument("--native-load", type=float, default=None, metavar="LOAD1",
+                    help="macOS 1-minute load average the window logged (uptime); "
+                         "used when the native JSON has no load, overrides it when it does")
+    ap.add_argument("--native-meta", action="append", default=[], metavar="KEY=VALUE",
+                    help="macOS-side header field: chip, macos, thermal (overrides the JSON)")
     args = ap.parse_args()
 
     meta = {}
@@ -97,15 +107,27 @@ def main():
             fail(f"--meta wants KEY=VALUE, got {kv!r}")
         meta[k.strip().lower()] = v.strip()
 
-    nchip, ndocs, ntimes = side(args.native, "macOS")
-    lchip, ldocs, ltimes = side(args.linux, "Linux")
+    native_meta = {}
+    for kv in args.native_meta:
+        k, _, v = kv.partition("=")
+        if not v:
+            fail(f"--native-meta wants KEY=VALUE, got {kv!r}")
+        k = k.strip().lower()
+        if k not in ("chip", "macos", "thermal"):
+            fail(f"--native-meta key must be chip, macos, or thermal, got {k!r}")
+        native_meta["device" if k == "chip" else k] = v.strip()
+    if args.native_load is not None:
+        native_meta["load"] = args.native_load
+
+    nchip, ndocs, ntimes = side(args.native, "macOS", native_meta)
+    lchip, ldocs, ltimes = side(args.linux, "Linux", {})
     if nchip != lchip:
         fail(f"chips differ: native {nchip!r} vs linux {lchip!r}; "
              "compare only runs recorded on the same chip")
     for p, d in zip(args.native, ndocs):
         if d.get("load") in (None, ""):
-            fail(f"macOS file {p} lacks load field; run.sh/native-bench must record it "
-                 "(number or [1, 5, 15] minutes)")
+            fail(f"macOS file {p} lacks load field; pass --native-load with the "
+                 "load1 the window logged (number, or [1, 5, 15] minutes in JSON)")
 
     missing = (ntimes.keys() - ltimes.keys()) | (ltimes.keys() - ntimes.keys())
     if missing:
@@ -126,6 +148,7 @@ def main():
 
     print(f"# chip: native {ndocs[0].get('device')} | linux {linux.get('device')} ({nchip})")
     print(f"# macOS: {ndocs[0].get('macos', '(not recorded)')}")
+    print(f"# Thermal state (macOS): {ndocs[0].get('thermal') or '(not recorded)'}")
     for label, key in (("Linux kernel", "kernel"), ("Driver (Mesa git)", "driver"),
                        ("CPU governor", "governor"), ("ANE state", "ane")):
         print(f"# {label}: {hdr.get(key) or '(not recorded)'}")

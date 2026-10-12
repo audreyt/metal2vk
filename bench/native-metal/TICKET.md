@@ -27,8 +27,10 @@ sysctl -n hw.memsize >> system.txt
 uptime >> system.txt
 pmset -g therm >> system.txt
 
-# 2. three back-to-back runs. The JSON name is dated.
-#    Every run overwrites it. Rename between runs, or you keep only run 3.
+# 2. three back-to-back runs; the JSON filename is dated, so each run overwrites
+#    the last: rename it between runs or you keep only run 3.
+#    Note the first load number from the uptime line above:
+#    the pairing step passes it as --native-load.
 bash run.sh 2>&1 | tee native-run1.txt
 cp results/results-native-metal-*.json results/native-run1.json
 bash run.sh 2>&1 | tee native-run2.txt
@@ -71,7 +73,9 @@ sysctl -n hw.memsize >> system.txt
 uptime >> system.txt
 pmset -g therm >> system.txt
 
-# 2. three back-to-back runs, renamed as in window A
+# 2. three back-to-back runs, renamed as in window A.
+#    Note the first load number from the uptime line above:
+#    the pairing step passes it as --native-load.
 bash run.sh 2>&1 | tee native-run1.txt
 cp results/results-native-metal-*.json results/native-run1.json
 bash run.sh 2>&1 | tee native-run2.txt
@@ -123,6 +127,7 @@ Work from `bench/native-metal/` in a checkout that holds both file sets:
 python3 compare.py \
   --native results/native-run1.json results/native-run2.json results/native-run3.json \
   --linux ../linux-run1.json ../linux-run2.json \
+  --native-load 0.12 \
   --meta kernel=$(cat kernel.txt) \
   --meta driver=$(cat mesa-git.txt) \
   --meta governor=$(cat governor.txt) \
@@ -130,8 +135,10 @@ python3 compare.py \
   --meta load=0.12
 ```
 
+The native JSON has no `load` field today. Pass the load1 from the macOS window's `uptime` line as `--native-load`; `--native-meta chip=... macos=... thermal=...` fills any native header field the JSON lacks.
+
 `compare.py` refuses on a chip mismatch. It refuses on a missing case.
-It refuses on a failed check. It refuses on a native JSON without `load` and `device`.
+It refuses on a failed check. It refuses on a native JSON without `load` and `device`, unless `--native-load` or `--native-meta` supplies them.
 It prints a loud warning when a recorded load average goes above 0.5.
 Only a clean run produces a table worth publishing.
 One chip. One governor. Driver named.

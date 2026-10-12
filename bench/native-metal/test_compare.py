@@ -51,11 +51,12 @@ class CompareTest(unittest.TestCase):
         p.write_text(json.dumps(doc))
         return str(p)
 
-    def run_compare(self, native, linux, meta=()):
+    def run_compare(self, native=(), linux=(), meta=(), native_flags=()):
         return subprocess.run(
             [sys.executable, str(Path(__file__).parent / "compare.py"),
              "--native", *native, "--linux", *linux,
-             *[a for m in meta for a in ("--meta", m)]],
+             *[a for m in meta for a in ("--meta", m)],
+             *native_flags],
             capture_output=True, text=True)
 
     def test_median_ratio_and_header(self):
@@ -128,6 +129,47 @@ class CompareTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("WARNING", r.stdout)
         self.assertIn("2.1", r.stdout)
+
+    def test_native_load_flag_supplies_missing_load(self):
+        doc = native_doc()
+        del doc["load"]
+        nat = self.write("n.json", doc)
+        lin = self.write("l.json", linux_doc())
+        r = self.run_compare([nat], [lin], native_flags=["--native-load", "0.30"])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("WARNING", r.stdout)
+
+    def test_native_load_flag_overrides_json_and_warns(self):
+        nat = self.write("n.json", native_doc(load=0.10))
+        lin = self.write("l.json", linux_doc())
+        r = self.run_compare([nat], [lin], native_flags=["--native-load", "1.20"])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("WARNING", r.stdout)
+        self.assertIn("1.2", r.stdout)
+
+    def test_native_meta_supplies_chip_macos_thermal(self):
+        doc = native_doc()
+        del doc["device"]
+        del doc["macos"]
+        nat = self.write("n.json", doc)
+        lin = self.write("l.json", linux_doc())
+        r = self.run_compare(
+            [nat], [lin],
+            native_flags=["--native-meta", "chip=Apple M2 Max",
+                    "--native-meta", "macos=Version 26.6.2 (Build 25G83)",
+                    "--native-meta", "thermal=Nominal"])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("Apple M2 Max", r.stdout)
+        self.assertIn("Version 26.6.2 (Build 25G83)", r.stdout)
+        self.assertIn("Nominal", r.stdout)
+
+    def test_native_meta_chip_mismatch_still_refused(self):
+        nat = self.write("n.json", native_doc(chip="Apple M1 Max"))
+        lin = self.write("l.json", linux_doc(tag="g14c"))
+        r = self.run_compare([nat], [lin],
+                             native_flags=["--native-meta", "thermal=Nominal"])
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("chip", r.stderr.lower())
 
 
 if __name__ == "__main__":
