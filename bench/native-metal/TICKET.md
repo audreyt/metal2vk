@@ -113,7 +113,7 @@ cp bench/results-g14c-*.json bench/linux-run2.json
 
 The run takes a few minutes.
 `run-all.sh` compiles the cases, then runs the bench, then the sweep.
-The receipts land in `bench/` as `results-g14c-YYYY-MM-DD.json`.
+The result files land in `bench/` as `results-g14c-YYYY-MM-DD.json`.
 The dated name overwrites. The ticket above renames each run into `bench/linux-run1.json` and `bench/linux-run2.json`.
 Two back-to-back runs give the Linux side a median and a spread.
 Keep the machine quiet. Keep one governor for every run.
