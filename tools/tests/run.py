@@ -96,6 +96,20 @@ kernel void matrix_cols(device const char* src [[buffer(0)]],
 }
 """
 
+SHARED_SHIM = """\
+#include <metal_stdlib>
+using namespace metal;
+constexpr bfloat bf = bfloat(1.5f);
+static_assert(float(bf) == 1.5f, "constexpr bfloat roundtrip");
+kernel void shared_shim(device ulong* out [[buffer(0)]],
+                        uint tid [[thread_position_in_grid]]) {
+  uint2 words = uint2(tid, tid + 1u);
+  out[tid * 3u] = as_type<ulong>(words);
+  out[tid * 3u + 1u] = metal::select(1, 2, false);
+  out[tid * 3u + 2u] = metal::select(1, 2, true);
+}
+"""
+
 fails = 0
 
 
@@ -129,7 +143,7 @@ def main():
         src = root / "msl"
         src.mkdir()
         for n, text in (("plain.metal", PLAIN), ("template.metal", TEMPLATE), ("refused.metal", REFUSED),
-                        ("broken.metal", BROKEN), ("matrix.metal", MATRIX)):
+                        ("broken.metal", BROKEN), ("matrix.metal", MATRIX), ("shared_shim.metal", SHARED_SHIM)):
             (src / n).write_text(text)
         cache = root / "cache"
         out = root / "out"
@@ -174,6 +188,9 @@ def main():
         rc, so, se, line = run(src / "matrix.metal", out, cache)
         check(rc == 0 and bool(line) and line.get("status") == "ok", "matrix staging kernel compiles to valid SPIR-V")
         check(bool(line) and line.get("name") == "matrix_cols", "matrix kernel reflection names matrix_cols")
+        rc, so, se, line = run(src / "shared_shim.metal", out, cache)
+        check(rc == 0 and bool(line) and line.get("status") == "ok",
+              f"shared shim kernel compiles to valid SPIR-V ({se.strip()})")
 
         # name selection: template kernel with two instantiations
         rc, so, se, line = run(src / "template.metal", out, cache)
