@@ -77,39 +77,52 @@ gone), 827 `translator-bug`, 61 `shim-missing-feature`; every failing entry
 still carries one of those classes (no `giveup` refusals fired: the corpus
 stays off the Metal 4 tensor path, `GGML_METAL_HAS_TENSOR` undefined).
 
-The 28 entries the matrix shim unblocks are the ones whose first error used to
-be `unknown type name 'float4x4' / 'bfloat4x4' / 'half2x4'` and whose body
-consists entirely of the operations the new shim matrix supports (column
-subscript, scalar multiply, C-style cast between matrix types, threadgroup
-array of matrices). The 888 that still fail split into the classes below, and
-each class is now small enough to fix in its own PR:
+The 28 entries the matrix shim unblocks are the kernels whose first error used
+to be the matrix type wall. Two of them exercise the new matrix API directly
+(`lightning_indexer_f{16,32}` / `_q{4_0,5_0,8_0}` -- 5 entries, and the 14
+`mul_mm_id_*_f{16,32}` quant variants that dequantise A-tiles into
+`float4x4` / `bfloat4x4` / `half4x4` and reinterpret B-tiles as
+`half2x4`); the remaining 9 are `mul_mm_id_map0_ne20_*` kernels, which never
+name a matrix type in their own bodies but live in the same `mul_mm.metal` TU
+whose earlier parse failure had been blocking every host_name instantiation
+in the file. The 888 that still fail split into the classes below, and each
+class is now small enough to fix in its own PR:
 
-1. `translator-bug` (827), sub-breakdown by first error:
+1. `translator-bug` (827), sub-breakdown by first error (counts from
+   `results.tsv`):
    - 407 (`330 'C' + 77 'Q'`) `use of undeclared identifier` on the
      function-constant template arguments the entries read via
      `[[function_constant(int C)]]` / `[[function_constant(int Q)]]`. The
      rewriter substitutes the values for template parameters it knows
-     (`tparam_names`), but the `[[function_constant]]` attribute is a kernel
-     attribute, not a template parameter, and no entry in the rewriter's
-     attribute model knows the value. Two attributes cover the bulk of the
-     corpus.
+     (`tparam_names`), but `[[function_constant]]` is a kernel attribute,
+     not a template parameter, and the rewriter's attribute model does not
+     know the value. Two attributes cover the bulk of the corpus.
    - 231 `pointers to functions are not allowed`. The rewriter substitutes
      the function-pointer template parameter NAME in body calls (the
      `tparam_names` fallback that landed with this run), but the function
-     pointer TYPE still appears in the emitted `.cl` -- inside a `decltype`
-     or a default-argument expression the rewriter does not rewrite -- and
-     OpenCL C++ rejects the type at parse time.
+     pointer TYPE still appears in the emitted `.cl` -- inside a
+     `decltype` or default-argument expression the rewriter does not
+     rewrite -- and OpenCL C++ rejects the type at parse time.
    - 89 `no matching function for call to 'best_index_int8'`. The function
      lives in ggml's C++ runtime, not the Metal TU; the kernel relies on a
      device-side host bridge that this pipeline does not model.
    - 43 `invalid LLVM IR input: Instruction does not dominate all uses!`.
-     The IR-shape bug the baseline already ranked (`kernel_soft_max_f32` and
-     neighbours); the matmul inner loops' B-tile load is non-dominating.
-   - 18 (`9 + 6 + 3`) `forward references to non-struct type`. A clang
-     ordering edge in the rewriter output.
-   - 6 `C-style cast from vector vec<float, 4> to vector half4 of different
-     size`. Metal accepts the elementwise narrowing; OpenCL C++ does not.
+     The IR-shape bug the baseline already ranked on `kernel_soft_max_f32`
+     and neighbours; the matmul inner loops' B-tile load is non-dominating.
+   - 26 `OpPtrAccessChain result type ... does not match` (the
+     `line NNNN:` spirv-val-format error, emitted by clspv when the typed
+     GEP / pointer-shape pass rejects a struct-typed access). Concentrated
+     in the `mul_mm_id` quant variants for `iq{1_s,2_s,2_xs,2_xxs,3_s,3_xxs,
+     4_xs}` and `q{1_0,2_0,3_K,6_K}` / `tq2_0`. Compile produces a
+     `compile=ok, spirv_val=fail` row.
+   - 22 (`9 at 12:1 + 6 at 14:1 + 3 at 13:1 + 2 at 15:1 + 2 at 11:1`)
+     `forward references to non-struct type`. A clang ordering edge in
+     the rewriter output.
+   - 6 `C-style cast from vector vec<float, 4> to vector half4 of
+     different size`. Metal accepts the elementwise narrowing; OpenCL C++
+     does not.
    - 2 `expected unqualified-id`. A rewriter edge.
+   - 1 `cannot initialize a parameter`. A rewriter edge.
 2. `shim-missing-feature` (61), sub-breakdown:
    - 60 `scalar operand type has greater rank than the type of the vector
      element. ('ushort2' and 'int')`. Metal promotes the scalar to the

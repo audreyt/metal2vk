@@ -178,6 +178,11 @@ def run_entry(tool, cache, out, tu, name, validator, log_lock):
         row["compile"] = "refused"
         row["giveup"] = result.get("refused", "M2V-GIVEUP")
         row["error"] = diag(r.stderr) or result.get("refused", "")
+    elif r.returncode == 5 or result.get("status") == "spirv-val failed":
+        # m2v-compile produces a .spv but spirv-val rejects it; the pipeline stage that failed is validation, not compilation.
+        row["compile"] = "ok"
+        row["spirv_val"] = "fail"
+        row["error"] = diag(r.stderr) or result.get("detail", "spirv-val failed")
     elif r.returncode == 0 and result.get("status") == "ok":
         row["compile"] = "ok"
         check = subprocess.run([str(validator), "--target-env", "vulkan1.3", result["spv"]],

@@ -644,8 +644,8 @@ kernel_mul_mm_iq4_xs_f16	kernels/mul_mm.metal:903	error	n/a	invalid LLVM IR inpu
 kernel_mul_mm_tq2_0_f16	kernels/mul_mm.metal:904	error	n/a	invalid LLVM IR input: Instruction does not dominate all uses!	-	translator-bug
 kernel_mul_mm_id_f32_f32	kernels/mul_mm.metal:912	ok	pass		-	-
 kernel_mul_mm_id_f16_f32	kernels/mul_mm.metal:913	ok	pass		-	-
-kernel_mul_mm_id_q1_0_f32	kernels/mul_mm.metal:917	error	n/a	line 1327: OpPtrAccessChain result type <id> '1060[%_struct_1060]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_q2_0_f32	kernels/mul_mm.metal:918	error	n/a	line 1388: OpPtrAccessChain result type <id> '1090[%_struct_1090]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_q1_0_f32	kernels/mul_mm.metal:917	ok	fail	line 1327: OpPtrAccessChain result type <id> '1060[%_struct_1060]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_q2_0_f32	kernels/mul_mm.metal:918	ok	fail	line 1388: OpPtrAccessChain result type <id> '1090[%_struct_1090]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
 kernel_mul_mm_id_q4_0_f32	kernels/mul_mm.metal:919	ok	pass		-	-
 kernel_mul_mm_id_q4_1_f32	kernels/mul_mm.metal:920	error	n/a	15:1: error: forward references to non-struct type	-	translator-bug
 kernel_mul_mm_id_q5_0_f32	kernels/mul_mm.metal:921	ok	pass		-	-
@@ -653,24 +653,24 @@ kernel_mul_mm_id_q5_1_f32	kernels/mul_mm.metal:922	error	n/a	15:1: error: forwar
 kernel_mul_mm_id_q8_0_f32	kernels/mul_mm.metal:923	ok	pass		-	-
 kernel_mul_mm_id_mxfp4_f32	kernels/mul_mm.metal:927	ok	pass		-	-
 kernel_mul_mm_id_q2_K_f32	kernels/mul_mm.metal:929	error	n/a	13:1: error: forward references to non-struct type	-	translator-bug
-kernel_mul_mm_id_q3_K_f32	kernels/mul_mm.metal:930	error	n/a	line 1228: OpPtrAccessChain result type <id> '1009[%_struct_1009]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_q3_K_f32	kernels/mul_mm.metal:930	ok	fail	line 1228: OpPtrAccessChain result type <id> '1009[%_struct_1009]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
 kernel_mul_mm_id_q4_K_f32	kernels/mul_mm.metal:931	error	n/a	13:1: error: forward references to non-struct type	-	translator-bug
 kernel_mul_mm_id_q5_K_f32	kernels/mul_mm.metal:932	error	n/a	13:1: error: forward references to non-struct type	-	translator-bug
-kernel_mul_mm_id_q6_K_f32	kernels/mul_mm.metal:933	error	n/a	line 1231: OpPtrAccessChain result type <id> '1010[%_struct_1010]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_iq2_xxs_f32	kernels/mul_mm.metal:934	error	n/a	line 1787: OpPtrAccessChain result type <id> '1529[%_struct_1529]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_iq2_xs_f32	kernels/mul_mm.metal:935	error	n/a	line 2003: OpPtrAccessChain result type <id> '1748[%_struct_1748]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_iq3_xxs_f32	kernels/mul_mm.metal:936	error	n/a	line 1657: OpPtrAccessChain result type <id> '1428[%_struct_1428]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_iq3_s_f32	kernels/mul_mm.metal:937	error	n/a	line 1795: OpPtrAccessChain result type <id> '1565[%_struct_1565]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_iq2_s_f32	kernels/mul_mm.metal:938	error	n/a	line 2234: OpPtrAccessChain result type <id> '2014[%_struct_2014]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_iq1_s_f32	kernels/mul_mm.metal:939	error	n/a	line 3239: OpPtrAccessChain result type <id> '3016[%_struct_3016]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_iq1_m_f32	kernels/mul_mm.metal:940	error	n/a	line 2803: OpAccessChain reached non-composite type while indexes still remain to be traversed.	-	translator-bug
+kernel_mul_mm_id_q6_K_f32	kernels/mul_mm.metal:933	ok	fail	line 1231: OpPtrAccessChain result type <id> '1010[%_struct_1010]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq2_xxs_f32	kernels/mul_mm.metal:934	ok	fail	line 1787: OpPtrAccessChain result type <id> '1529[%_struct_1529]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq2_xs_f32	kernels/mul_mm.metal:935	ok	fail	line 2003: OpPtrAccessChain result type <id> '1748[%_struct_1748]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq3_xxs_f32	kernels/mul_mm.metal:936	ok	fail	line 1657: OpPtrAccessChain result type <id> '1428[%_struct_1428]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq3_s_f32	kernels/mul_mm.metal:937	ok	fail	line 1795: OpPtrAccessChain result type <id> '1565[%_struct_1565]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq2_s_f32	kernels/mul_mm.metal:938	ok	fail	line 2234: OpPtrAccessChain result type <id> '2014[%_struct_2014]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq1_s_f32	kernels/mul_mm.metal:939	ok	fail	line 3239: OpPtrAccessChain result type <id> '3016[%_struct_3016]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq1_m_f32	kernels/mul_mm.metal:940	ok	fail	line 2803: OpAccessChain reached non-composite type while indexes still remain to be traversed.	-	translator-bug
 kernel_mul_mm_id_iq4_nl_f32	kernels/mul_mm.metal:941	ok	pass		-	-
-kernel_mul_mm_id_iq4_xs_f32	kernels/mul_mm.metal:942	error	n/a	line 1209: OpPtrAccessChain result type <id> '991[%_struct_991]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_tq2_0_f32	kernels/mul_mm.metal:943	error	n/a	line 1292: OpPtrAccessChain result type <id> '1029[%_struct_1029]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq4_xs_f32	kernels/mul_mm.metal:942	ok	fail	line 1209: OpPtrAccessChain result type <id> '991[%_struct_991]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_tq2_0_f32	kernels/mul_mm.metal:943	ok	fail	line 1292: OpPtrAccessChain result type <id> '1029[%_struct_1029]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
 kernel_mul_mm_id_f32_f16	kernels/mul_mm.metal:945	ok	pass		-	-
 kernel_mul_mm_id_f16_f16	kernels/mul_mm.metal:946	ok	pass		-	-
-kernel_mul_mm_id_q1_0_f16	kernels/mul_mm.metal:947	error	n/a	line 1255: OpPtrAccessChain result type <id> '1001[%_struct_1001]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_q2_0_f16	kernels/mul_mm.metal:948	error	n/a	line 1316: OpPtrAccessChain result type <id> '1031[%_struct_1031]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_q1_0_f16	kernels/mul_mm.metal:947	ok	fail	line 1255: OpPtrAccessChain result type <id> '1001[%_struct_1001]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_q2_0_f16	kernels/mul_mm.metal:948	ok	fail	line 1316: OpPtrAccessChain result type <id> '1031[%_struct_1031]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
 kernel_mul_mm_id_q4_0_f16	kernels/mul_mm.metal:949	ok	pass		-	-
 kernel_mul_mm_id_q4_1_f16	kernels/mul_mm.metal:950	error	n/a	14:1: error: forward references to non-struct type	-	translator-bug
 kernel_mul_mm_id_q5_0_f16	kernels/mul_mm.metal:951	ok	pass		-	-
@@ -678,20 +678,20 @@ kernel_mul_mm_id_q5_1_f16	kernels/mul_mm.metal:952	error	n/a	14:1: error: forwar
 kernel_mul_mm_id_q8_0_f16	kernels/mul_mm.metal:953	ok	pass		-	-
 kernel_mul_mm_id_mxfp4_f16	kernels/mul_mm.metal:957	ok	pass		-	-
 kernel_mul_mm_id_q2_K_f16	kernels/mul_mm.metal:959	error	n/a	12:1: error: forward references to non-struct type	-	translator-bug
-kernel_mul_mm_id_q3_K_f16	kernels/mul_mm.metal:960	error	n/a	line 1148: OpPtrAccessChain result type <id> '940[%_struct_940]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_q3_K_f16	kernels/mul_mm.metal:960	ok	fail	line 1148: OpPtrAccessChain result type <id> '940[%_struct_940]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
 kernel_mul_mm_id_q4_K_f16	kernels/mul_mm.metal:961	error	n/a	12:1: error: forward references to non-struct type	-	translator-bug
 kernel_mul_mm_id_q5_K_f16	kernels/mul_mm.metal:962	error	n/a	12:1: error: forward references to non-struct type	-	translator-bug
-kernel_mul_mm_id_q6_K_f16	kernels/mul_mm.metal:963	error	n/a	line 1156: OpPtrAccessChain result type <id> '947[%_struct_947]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_iq2_xxs_f16	kernels/mul_mm.metal:964	error	n/a	line 1712: OpPtrAccessChain result type <id> '1466[%_struct_1466]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_iq2_xs_f16	kernels/mul_mm.metal:965	error	n/a	line 1928: OpPtrAccessChain result type <id> '1685[%_struct_1685]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_iq3_xxs_f16	kernels/mul_mm.metal:966	error	n/a	line 1582: OpPtrAccessChain result type <id> '1365[%_struct_1365]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_iq3_s_f16	kernels/mul_mm.metal:967	error	n/a	line 1720: OpPtrAccessChain result type <id> '1502[%_struct_1502]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_iq2_s_f16	kernels/mul_mm.metal:968	error	n/a	line 2159: OpPtrAccessChain result type <id> '1951[%_struct_1951]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_iq1_s_f16	kernels/mul_mm.metal:969	error	n/a	line 3164: OpPtrAccessChain result type <id> '2953[%_struct_2953]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_iq1_m_f16	kernels/mul_mm.metal:970	error	n/a	line 2784: OpAccessChain reached non-composite type while indexes still remain to be traversed.	-	translator-bug
+kernel_mul_mm_id_q6_K_f16	kernels/mul_mm.metal:963	ok	fail	line 1156: OpPtrAccessChain result type <id> '947[%_struct_947]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq2_xxs_f16	kernels/mul_mm.metal:964	ok	fail	line 1712: OpPtrAccessChain result type <id> '1466[%_struct_1466]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq2_xs_f16	kernels/mul_mm.metal:965	ok	fail	line 1928: OpPtrAccessChain result type <id> '1685[%_struct_1685]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq3_xxs_f16	kernels/mul_mm.metal:966	ok	fail	line 1582: OpPtrAccessChain result type <id> '1365[%_struct_1365]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq3_s_f16	kernels/mul_mm.metal:967	ok	fail	line 1720: OpPtrAccessChain result type <id> '1502[%_struct_1502]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq2_s_f16	kernels/mul_mm.metal:968	ok	fail	line 2159: OpPtrAccessChain result type <id> '1951[%_struct_1951]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq1_s_f16	kernels/mul_mm.metal:969	ok	fail	line 3164: OpPtrAccessChain result type <id> '2953[%_struct_2953]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq1_m_f16	kernels/mul_mm.metal:970	ok	fail	line 2784: OpAccessChain reached non-composite type while indexes still remain to be traversed.	-	translator-bug
 kernel_mul_mm_id_iq4_nl_f16	kernels/mul_mm.metal:971	ok	pass		-	-
-kernel_mul_mm_id_iq4_xs_f16	kernels/mul_mm.metal:972	error	n/a	line 1134: OpPtrAccessChain result type <id> '928[%_struct_928]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
-kernel_mul_mm_id_tq2_0_f16	kernels/mul_mm.metal:973	error	n/a	line 1220: OpPtrAccessChain result type <id> '969[%_struct_969]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_iq4_xs_f16	kernels/mul_mm.metal:972	ok	fail	line 1134: OpPtrAccessChain result type <id> '928[%_struct_928]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
+kernel_mul_mm_id_tq2_0_f16	kernels/mul_mm.metal:973	ok	fail	line 1220: OpPtrAccessChain result type <id> '969[%_struct_969]' (OpTypeStruct) does not match the type that results from indexing into the base <id> '1[%uchar]' (OpTypeInt).	-	translator-bug
 kernel_mul_mv_f32_f32	kernels/mul_mv.metal:1040	error	n/a	pointers to functions are not allowed	-	translator-bug
 kernel_mul_mv_f16_f32	kernels/mul_mv.metal:1041	error	n/a	pointers to functions are not allowed	-	translator-bug
 kernel_mul_mv_f16_f16	kernels/mul_mv.metal:1042	error	n/a	pointers to functions are not allowed	-	translator-bug
