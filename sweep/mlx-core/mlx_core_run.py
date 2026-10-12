@@ -139,6 +139,18 @@ def expand(mlx_root, work):
     return rows, bad_files
 
 
+def scrub_diag(line):
+    """first_error for the TSV: basename(location) + message, absolute paths and
+    JSON-escaped continuations removed."""
+    seg = str(line).split(" | ")[0].split("\\n")[0]
+    m = re.search(r"((?:[^\s:]+/)?[^\s/:]+:\d+(?::\d+)?)\s*:\s*(?:fatal )?error: (.*)", seg)
+    if m:
+        return m.group(1).split("/")[-1] + ": " + m.group(2)
+    i = seg.find(" error: ")
+    if i >= 0:
+        return seg[i + 1 :]
+    return seg.split("/")[-1] if seg.startswith("/") else seg
+
 def classify(rc, status, detail, spv_error):
     """Cause class from the failure text: the task's five classes plus the bookkeeping ones."""
     err = (spv_error or detail or "").lower()
@@ -152,6 +164,14 @@ def classify(rc, status, detail, spv_error):
         return "duplicate_host_name"  # two template instantiations share one host_name (select time)
     if "clang frontend command failed" in err:
         return "clang_frontend_exit"  # clang exited nonzero without a usable diagnostic (139/134 under load)
+    if "must be initialized by a constant expression" in err:
+        return "constexpr_init"  # clang's constexpr evaluator rejects MLX's static constexpr constant init
+    if "variable cannot have an initializer" in err:
+        return "local_initializer"  # threadgroup/local array with a brace initializer: no OpenCL spelling
+    if "invalid vector element type" in err:
+        return "shim_gap"  # e.g. boolN: the shim's vec_sel cannot carry bool elements
+    if "invalid operands to binary expression" in err:
+        return "shim_gap"  # e.g. bfloat struct fallback without binary operators on clang-19
     if "an attribute list cannot appear here" in err:
         return "attribute_list_position"
     if "conditional expression is ambiguous" in err:
@@ -203,7 +223,7 @@ def compile_rows(rows, args):
         results[i] = {
             "name": row["name"], "origin": row["origin"], "line": row["line"], "family": row["family"],
             "compile": "ok" if r.returncode == 0 and js.get("status") == "ok" else "FAIL",
-            "spirv_val": val_status, "first_error": (spv_error or detail)[:200],
+            "spirv_val": val_status, "first_error": scrub_diag((spv_error or detail))[:200],
             "m2v_giveup": str(js.get("refused", "no")) if (r.returncode == 3 or js.get("status") == "refused") else "no",
             "cause": "" if (r.returncode == 0 and js.get("status") == "ok" and val_status == "ok")
                     else classify(r.returncode, js.get("status"), detail, spv_error),
