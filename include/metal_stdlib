@@ -320,6 +320,61 @@ M2V_SHUF(simd_shuffle_xor, sub_group_shuffle_xor, mask)
 M2V_SHUF(simd_broadcast, sub_group_broadcast, lane)
 template <typename T> METAL_FUNC T simd_broadcast_first(T x) { return simd_broadcast(x, (ushort)0); }
 
+// ---- matrix<T, C, R>: MSL's register-resident column-major matrix, C columns of R-element vectors ----
+// ggml's mul_mm / mul_mv_ext / flash-attn families stage tiles through float4x4 / half2x4 / bfloat4x4 and reinterpret
+// device or threadgroup buffers as them, so the storage is a plain aggregate of column vectors (float4x4 lays out and
+// aligns like four float4 columns, as MSL specifies). Copies and conversions are element loops: an aggregate struct
+// copy crosses address spaces as one whole-object memcpy, the exact pointer shape clspv cannot rebuild (the same
+// reason vec<bfloat, N> carries user copy operations).
+template <typename T, int C, int R> struct matrix {
+  vec<T, R> c[C];
+  METAL_FUNC matrix() = default;
+  METAL_FUNC matrix(const matrix& o) {
+    for (int i = 0; i < C; i++)
+      for (int j = 0; j < R; j++) c[i][j] = o.c[i][j];
+  }
+  METAL_FUNC matrix& operator=(const matrix& o) {
+    for (int i = 0; i < C; i++)
+      for (int j = 0; j < R; j++) c[i][j] = o.c[i][j];
+    return *this;
+  }
+  // Metal's C-style cast between matrix types is elementwise ((float4x4) half4x4, (float4x4) bfloat4x4). Every
+  // element routes through float: half and bfloat widen to float exactly, so only the final narrowing rounds, which
+  // is Metal's promotion order.
+  template <typename U> METAL_FUNC matrix(const matrix<U, C, R>& o) {
+    for (int i = 0; i < C; i++)
+      for (int j = 0; j < R; j++) c[i][j] = (T)(float)o.c[i][j];
+  }
+  METAL_FUNC vec<T, R>& operator[](int i) { return c[i]; }
+  METAL_FUNC const vec<T, R>& operator[](int i) const { return c[i]; }
+  // m * s keeps the matrix element type (ggml: (half2x4)(device_tile * (T1) s1_inv)).
+  template <typename U> METAL_FUNC matrix operator*(U s) const {
+    matrix r;
+    for (int i = 0; i < C; i++)
+      for (int j = 0; j < R; j++) r.c[i][j] = c[i][j] * s;
+    return r;
+  }
+};
+template <typename T, int C, int R, typename U>
+METAL_FUNC matrix<T, C, R> operator*(U s, const matrix<T, C, R>& m) {
+  return m * s;
+}
+#define M2V_MATRIX_TYPEDEF(T, N, M) typedef matrix<T, N, M> T##N##x##M;
+#define M2V_MATRIX_ROW(T, N)                                                                                           \
+  M2V_MATRIX_TYPEDEF(T, N, 2)                                                                                          \
+  M2V_MATRIX_TYPEDEF(T, N, 3)                                                                                          \
+  M2V_MATRIX_TYPEDEF(T, N, 4)
+#define M2V_MATRIX_ALL(T)                                                                                              \
+  M2V_MATRIX_ROW(T, 2)                                                                                                 \
+  M2V_MATRIX_ROW(T, 3)                                                                                                 \
+  M2V_MATRIX_ROW(T, 4)
+M2V_MATRIX_ALL(float)
+M2V_MATRIX_ALL(half)
+M2V_MATRIX_ALL(bfloat)
+#undef M2V_MATRIX_ALL
+#undef M2V_MATRIX_ROW
+#undef M2V_MATRIX_TYPEDEF
+
 // ---- simdgroup_matrix<T, 8, 8>, Apple fragment layout: lane -> (row, col0, col0 + 1), two elements per lane ----
 METAL_FUNC int m2v_row(uint lane) { return (int)(((lane >> 4) & 1) * 4 + ((lane >> 1) & 3)); }
 METAL_FUNC int m2v_col(uint lane) { return (int)(((lane >> 3) & 1) * 4 + (lane & 1) * 2); }
@@ -352,6 +407,14 @@ template <typename T, int R, int C> struct simdgroup_matrix {
   }
   METAL_FUNC __private vec<T, 2>& thread_elements() __private { return el; }
 };
+
+// MSL 3.1: every fragment element set to v (unlike the constructor, which is the diagonal value * I).
+template <typename T, int N> METAL_FUNC simdgroup_matrix<T, N, N> make_filled_simdgroup_matrix(T v) {
+  simdgroup_matrix<T, N, N> r;
+  r.thread_elements()[0] = v;
+  r.thread_elements()[1] = v;
+  return r;
+}
 
 #ifdef M2V_NO_COOPMAT
 // Portable fallback: D = A * B + C with subgroup shuffles in the Apple fragment layout (any 32-wide subgroup device).
