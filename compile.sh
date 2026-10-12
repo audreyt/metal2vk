@@ -68,6 +68,11 @@ for c in $CASES; do
   # pointer members of kernel argument structs are inexpressible on 32-bit Vulkan; hoist the
   # loaded ones to buffer arguments and retype the dead ones (no-op otherwise)
   grep -qE '^%[A-Za-z0-9_.]+ = type \{.*ptr addrspace' "$OUT/$c.ll" && python3 "$H/sweep/hoist_struct_ptr_args.py" "$OUT/$c.ll" || true
+  # a guarded load from a workgroup array feeding a join phi is speculated by clspv's optimiser
+  # into a select over differently-typed workgroup pointers, which the producer emits as an
+  # ill-typed OpSelect that spirv-val rejects (the nvfp4 argmax shape); hoist the load into the
+  # branch block and select values first (no-op otherwise)
+  grep -q 'load .*ptr addrspace(3)' "$OUT/$c.ll" && python3 "$H/sweep/guarded_wg_load_select.py" "$OUT/$c.ll" || true
   PSB_FLAGS=$( [ "$PSB" = 1 ] && echo "--arch=spir64 --physical-storage-buffers" || true )
   # shellcheck disable=SC2086
   "$CLSPV" -x ir --cl-std=CLC++2021 --fp16 --inline-entry-points --spv-version=1.5 --long-vector $PSB_FLAGS "$OUT/$c.ll" -o "$OUT/$c.spv" > "$OUT/$c.clspv.log" 2>&1
