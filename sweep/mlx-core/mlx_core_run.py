@@ -148,6 +148,18 @@ def classify(rc, status, detail, spv_error):
         return "clspv_timeout"
     if "m2v-giveup" in err or "gave up on a pointer rewrite" in err:
         return "clspv_limit"
+    if "matches" in err and "instantiations" in err:
+        return "duplicate_host_name"  # two template instantiations share one host_name (select time)
+    if "clang frontend command failed" in err:
+        return "clang_frontend_exit"  # clang exited nonzero without a usable diagnostic (139/134 under load)
+    if "an attribute list cannot appear here" in err:
+        return "attribute_list_position"
+    if "conditional expression is ambiguous" in err:
+        return "ambiguous_conditional"
+    if "excess elements" in err:
+        return "excess_elements_init"
+    if "too few elements in vector" in err:
+        return "vector_element_count"
     if any(k in err for k in ("assertion", "unreachable", "stack dump", "llvm error", "crash", "iselecode", "fatal error: backend")):
         return "translator_bug"
     if any(k in err for k in ("unknown type name", "no member named", "no matching", "no template named",
