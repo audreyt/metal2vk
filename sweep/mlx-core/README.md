@@ -72,10 +72,9 @@ valid     2285   (compile ok AND spirv-val vulkan1.3)
 failed   15016
 ```
 
-The tracked table comes from the run on this branch's head (the measurement covers
-the merged shim state; there is no isolated baseline of the intermediate branch
-states, so per-commit attribution of the gains would be guesswork and is not
-claimed).
+The tracked table comes from the run at `6f22d5b` with the merged shim state.
+There is no isolated baseline of the intermediate branch states, so per-commit
+attribution of the gains would be guesswork and is not claimed.
 
 ### By kernel family
 
@@ -147,7 +146,7 @@ claimed).
    types the shim's vector templates cannot represent), which is why
    steel_attn sits at zero while quantized and scaled_dot_product_attention
    compile. Until those surfaces are modelled, binary, reduce, unary, steel_gemm,
-   gemv, scan, fft, conv, rope, binary_two, quantized_nax, logsumexp, gemv_masked,
+   gemv, scan, fft, conv, binary_two, quantized_nax, logsumexp, gemv_masked,
    fp_quantized, fp_quantized_nax, random and fence stay at zero.
 
 2. **duplicate_host_name (768).** `steel_gemm_masked`'s macro table instantiates
