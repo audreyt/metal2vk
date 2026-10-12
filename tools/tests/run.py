@@ -16,7 +16,7 @@ entry 5, and every module must be byte-identical to the sweep's.
 import json
 import os
 import pathlib
-import shutil
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -120,6 +120,10 @@ def run(msl, out, cache, name=None, as_json=True):
 
 
 def main():
+    tparam_names = runpy.run_path(str(REPO / "sweep" / "m2v_sweep.py"))["tparam_names"]
+    check(tparam_names("void (*dequantize_func)(device const void *, short, thread SA_4x4 &)")
+          == ["dequantize_func"], "function-pointer template parameter keeps its declarator name")
+    check(tparam_names("typename T, int N") == ["T", "N"], "ordinary template parameter names stay intact")
     with tempfile.TemporaryDirectory(prefix="m2v-cli-test-") as td:
         root = pathlib.Path(td)
         src = root / "msl"
