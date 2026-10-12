@@ -207,13 +207,17 @@ def compile_rows(rows, args):
 
 def write_tsv(results, path, bad_files):
     cols = ["origin", "name", "family", "compile", "spirv_val", "first_error", "m2v_giveup", "cause"]
+
+    def clean(s):
+        return str(s).replace("\t", " ").replace("\n", " | ")[:200]
+
     with open(path, "w") as f:
         f.write("\t".join(cols) + "\n")
         for r in sorted(results, key=lambda r: (r["family"], r["origin"], r["line"], r["name"])):
             origin = f"{r['origin']}:{r['line']}"
-            f.write(origin + "\t" + "\t".join(str(r[c]).replace("\t", " ") for c in cols[1:]) + "\n")
+            f.write(origin + "\t" + "\t".join(clean(r[c]) for c in cols[1:]) + "\n")
         for b in bad_files:
-            f.write(f'{b["file"]}:0\t(file failed to expand)\t\tFAIL\t\t{b["error"]}\tno\texpand_error\n')
+            f.write(f'{b["file"]}:0\t(file failed to expand)\t\tFAIL\t\t{clean(b["error"])}\tno\texpand_error\n')
     ok = sum(r["compile"] == "ok" and r["spirv_val"] == "ok" for r in results)
     print(f"entries {len(results)} valid {ok} failed {len(results) - ok + len(bad_files)}", file=sys.stderr)
 
