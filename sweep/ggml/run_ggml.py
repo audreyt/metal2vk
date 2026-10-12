@@ -56,7 +56,8 @@ MARKER = re.compile(r'^#\s*(\d+)\s+"([^"]*)"')
 CAUSE_RULES = [
     (r"unknown type name|no type named|no member named|unknown template", "unsupported-type"),
     (r"greater rank than the type of the vector", "shim-missing-feature"),
-    (r"undeclared identifier|no matching function|no template named|redeclaration|static declaration|redefinition|"
+    (r"pointers to functions are not allowed|forward references to non-struct type|undeclared identifier|"
+     r"no matching function|no template named|redeclaration|static declaration|redefinition|"
      r"expected unqualified-id|invalid LLVM IR|cannot initialize a parameter|C-style cast", "translator-bug"),
     (r"WorkgroupStorageSize|exceeds|too (?:large|many)|push constant|descriptor|storage buffer|address space|unsupported", "clspv-limit"),
     (r"spirv-val|structure|blocks? |Op[A-Z]", "translator-bug"),

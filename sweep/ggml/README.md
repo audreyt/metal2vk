@@ -64,29 +64,63 @@ host_name; macro-generated names point at the invocation line), `compile` (ok, e
 refused), `spirv_val` (`spirv-val --target-env vulkan1.3`: pass, fail, n/a),
 `first_error`, `m2v_giveup` (the construct a refusal names, `-` otherwise), `cause`.
 
-Run 2026-10-12, clang 23.1.1, clspv `f2b01dd6` + the 20 `clspv-patches` scripts of
-that tree in CI order: **1019 entries, 103 valid, 916 failed**: 908
-`unsupported-type`, 7 `translator-bug`, 1 `shim-missing-feature`; every failing entry
-carries one of those classes (no `giveup` refusals fired: the corpus stays off the
-Metal 4 tensor path, `GGML_METAL_HAS_TENSOR` undefined).
+Run 2026-10-12 (baseline, no Metal matrix types in the shim), clang 23.1.1, clspv
+`f2b01dd6` + the 20 `clspv-patches` scripts of that tree in CI order: **1019
+entries, 103 valid, 916 failed** -- 908 `unsupported-type`, 7 `translator-bug`, 1
+`shim-missing-feature`.
 
-The three causes, what fails and why:
+Run 2026-10-12 (after `metal::matrix<T, C, R>` and the float / half / bfloat
+`NxM` typedefs land in the shim, plus a one-line `tparam_names` fallback so the
+rewriter substitutes ggml's function-pointer template parameters): **1019
+entries, 131 valid, 888 failed** -- 0 `unsupported-type` (the matrix wall is
+gone), 827 `translator-bug`, 61 `shim-missing-feature`; every failing entry
+still carries one of those classes (no `giveup` refusals fired: the corpus
+stays off the Metal 4 tensor path, `GGML_METAL_HAS_TENSOR` undefined).
 
-1. `unsupported-type` (908): the shim has no Metal matrix types. First error:
-   `unknown type name 'float4x4'; did you mean 'float4'?`: every entry of the 19
-   kernel files whose live code names a matrix type (`float4x4`, `bfloat4x4`,
-   `simdgroup_half8x8` template arguments of the mul_mm and flash-attn families;
-   0 failures outside those files). A real fix is matrix semantics in the shim plus
-   the clspv coopmat lowering that consumes them, not a typedef.
-2. `translator-bug` (7): driver codegen artifacts on individual entries. First error:
-   `error: invalid LLVM IR input: Instruction does not dominate all uses!`
-   (`kernel_soft_max_f32` and two neighbours; the generated IR fails opt's verifier),
-   plus `expected unqualified-id` (`kernel_snake_*`), a vector-to-scalar call the
-   wrapper emits (`kernel_unary_f32_f32_4`) and an oversize C-style cast
-   (`kernel_unary_f16_f16_4`).
-3. `shim-missing-feature` (1): `kernel_soft_max_f16_4`: `scalar operand type has
-   greater rank than the type of the vector element. ('float' and 'half4')`: Metal
-   promotes the float scalar into the half4 expression, OpenCL C++ refuses.
+The 28 entries the matrix shim unblocks are the ones whose first error used to
+be `unknown type name 'float4x4' / 'bfloat4x4' / 'half2x4'` and whose body
+consists entirely of the operations the new shim matrix supports (column
+subscript, scalar multiply, C-style cast between matrix types, threadgroup
+array of matrices). The 888 that still fail split into the classes below, and
+each class is now small enough to fix in its own PR:
+
+1. `translator-bug` (827), sub-breakdown by first error:
+   - 407 (`330 'C' + 77 'Q'`) `use of undeclared identifier` on the
+     function-constant template arguments the entries read via
+     `[[function_constant(int C)]]` / `[[function_constant(int Q)]]`. The
+     rewriter substitutes the values for template parameters it knows
+     (`tparam_names`), but the `[[function_constant]]` attribute is a kernel
+     attribute, not a template parameter, and no entry in the rewriter's
+     attribute model knows the value. Two attributes cover the bulk of the
+     corpus.
+   - 231 `pointers to functions are not allowed`. The rewriter substitutes
+     the function-pointer template parameter NAME in body calls (the
+     `tparam_names` fallback that landed with this run), but the function
+     pointer TYPE still appears in the emitted `.cl` -- inside a `decltype`
+     or a default-argument expression the rewriter does not rewrite -- and
+     OpenCL C++ rejects the type at parse time.
+   - 89 `no matching function for call to 'best_index_int8'`. The function
+     lives in ggml's C++ runtime, not the Metal TU; the kernel relies on a
+     device-side host bridge that this pipeline does not model.
+   - 43 `invalid LLVM IR input: Instruction does not dominate all uses!`.
+     The IR-shape bug the baseline already ranked (`kernel_soft_max_f32` and
+     neighbours); the matmul inner loops' B-tile load is non-dominating.
+   - 18 (`9 + 6 + 3`) `forward references to non-struct type`. A clang
+     ordering edge in the rewriter output.
+   - 6 `C-style cast from vector vec<float, 4> to vector half4 of different
+     size`. Metal accepts the elementwise narrowing; OpenCL C++ does not.
+   - 2 `expected unqualified-id`. A rewriter edge.
+2. `shim-missing-feature` (61), sub-breakdown:
+   - 60 `scalar operand type has greater rank than the type of the vector
+     element. ('ushort2' and 'int')`. Metal promotes the scalar to the
+     vector's element type; the affected OpenCL builtins (the
+     `metal::max` / `metal::min` / `metal::fma` overloads) reject mixed
+     rank. Adding a (vector, scalar) overload that promotes the scalar to
+     the vector's element type for the specific builtins the corpus uses
+     covers the bulk of these.
+   - 1 `scalar operand type has greater rank than the type of the vector
+     element. ('float' and 'half4')` (`kernel_soft_max_f16_4`): the same
+     promotion, the case the baseline run reported alone.
 
 ## Not verified here
 
