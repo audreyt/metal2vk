@@ -7,10 +7,11 @@ the second half of the alphabetical file list (26 files, even split; files
 generate, then checked through `tools/m2v-compile` (clang, opt, patched clspv)
 plus `spirv-val --target-env vulkan1.3`.
 
-Coverage: 60 assembled kernels across 12 files (one file in our half,
-`mlx_vlm/structured.py`, holds the single kernel KernelBatch already carried as
-`mlx_vlm_llguidance_mask`, so it is not redone here; `mlx_vlm/tests/
-test_models.py` mentions metal_kernel only in prose and has no call sites).
+Coverage: 60 assembled kernels across 11 files. Two more files in our half have
+no rows. `mlx_vlm/structured.py` holds the single kernel KernelBatch already
+carried as `mlx_vlm_llguidance_mask`, so it is not redone here.
+`mlx_vlm/tests/test_models.py` mentions metal_kernel only in prose and has no
+call sites.
 Results: `results-vlmb.tsv` (this directory).
 
 ## Commands
