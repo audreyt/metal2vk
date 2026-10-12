@@ -70,7 +70,7 @@ vlmb	mq_prod_score_4_r2_l2	mlx-vlm@8f5dc3d, mlx_vlm/turboquant.py:1744	187ffee35
 vlmb	nemotron_bm32_steel_linear_nt	mlx-vlm@8f5dc3d, mlx_vlm/models/nemotron_labs_diffusion/language.py:56	cab640944bf2dac4fac86c40b6b3e950a80e75a2f39919e9cdfbe1e44a75f9ab	yes		no
 vlmb	nemotron_small_row_gemv	mlx-vlm@8f5dc3d, mlx_vlm/models/nemotron_labs_diffusion/language.py:203	6f4a386b9312485054b5f3f64f948099ae9f9c74bf6479b0f6a13a320bff691d	yes		no
 vlmb	nemotron_small_row_swiglu	mlx-vlm@8f5dc3d, mlx_vlm/models/nemotron_labs_diffusion/language.py:435	8b5209c5e3831b3a366d4b9c8a9b193a638da90eeb3a9b8a1daa070da01bbbc4	yes		no
-vlmb	quantized_verify_nvfp4_argmax_t2_k64_n64_fp16	mlx-vlm@8f5dc3d, mlx_vlm/models/quantized_verifier.py:1974	de25b82ca910e624b49cdb0c747721aae1e6704f1c02961cfdb17448ed98d9de	no	 "detail": "error: line 651: Expected both objects to be of Result Type: Select\n  %479 = OpSelect %_ptr_Workgroup__arr__arr_uint_uint_2_uint_2 %476 %478 %11"}	no
+vlmb	quantized_verify_nvfp4_argmax_t2_k64_n64_fp16	mlx-vlm@8f5dc3d, mlx_vlm/models/quantized_verifier.py:1974	de25b82ca910e624b49cdb0c747721aae1e6704f1c02961cfdb17448ed98d9de	yes		no
 vlmb	mlx_vlm_affine_1bit_qmm_gs_64	mlx-vlm@8f5dc3d, mlx_vlm/quantization/one_bit.py:240	a9a165f69536fe4830e5440949e5dec5af6ada1cb1f5de26290ca7906086f852	yes		no
 vlmb	mlx_vlm_affine_1bit_qmv_gs_64_rows_4_aligned_1	mlx-vlm@8f5dc3d, mlx_vlm/quantization/one_bit.py:224	86a2671389a141a2f33bd04f5158f779210905b33f019cd4e815a4494592c8b2	yes		no
 vlmb	turboquant_pack_lowbit	mlx-vlm@8f5dc3d, mlx_vlm/turboquant.py:205	dbe9dc75729f4c3fe7cbfec5ca134ffc8245ea4e058c6e6c065a395f0d10850e	yes		no

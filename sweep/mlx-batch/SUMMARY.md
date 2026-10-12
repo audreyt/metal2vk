@@ -12,18 +12,18 @@ compile-tested only; no GPU dispatch is performed.
 |---|---:|---:|---:|---|
 | top (mlx-lm, mlx-vlm helpers, mlx-audio) | 14 | 14 | 0 | `results.tsv` |
 | vlmA (mlx-vlm first half) | 29 | 29 | 0 | `vlmA/results-vlmA.tsv` |
-| vlmb (mlx-vlm second half) | 60 | 59 | 1 | `vlmb/results-vlmb.tsv` |
+| vlmb (mlx-vlm second half) | 60 | 60 | 0 | `vlmb/results-vlmb.tsv` |
 | others (mlx-lm / mlx-examples / mlx-audio) | 16 | 16 | 0 | `others/results-others.tsv` |
-| **batch total (assembled)** | **119** | **118** | **1** | `results-all.tsv` |
+| **batch total (assembled)** | **119** | **119** | **0** | `results-all.tsv` |
 
-Combined with the existing 32-kernel sibling corpus (TensorFold layout, 31 compile-valid, 1 needs M5 tensor ops): 118 + 31 = **149 valid**, 119 + 32 = **151 total**.
+Combined with the existing 32-kernel sibling corpus (TensorFold layout, 31 compile-valid, 1 needs M5 tensor ops): 119 + 31 = **150 valid**, 119 + 32 = **151 total**.
 
 ## Denominators
 
 - 107 AST `metal_kernel()` callsites across the four pinned upstream trees (mlx-lm@2184db2: 11; mlx-examples@796f5b5: 3; mlx-vlm@8f5dc3d: 85; mlx-audio@17001a6: 8). This corrects the earlier draft's 106: `mlx-examples musicgen/encodec.py:14` is a real third mlx-examples callsite, not a duplicate of the census.
 - The 119 rows cover 105 distinct callsites. The other 14 rows are extra variants out of the multi-variant generators: `mlx_lm/models/gated_delta.py:130` (4 bodies), `mlx_vlm/models/gated_delta.py:148` (8), `mlx_vlm/models/qwen3_5/gated_delta.py:109` (4), `qwen3_5/gated_delta.py:540` (2).
 - Equation: 105 covered + 2 not assembled = 107 callsites (check). The 2 not assembled carry no new kernel body: `mlx-vlm bitnet/bitlinear.py:44` (the same `bitlinear_matmul` body as mlx-lm's, owned by the parent `results.tsv`) and `mlx-examples musicgen/encodec.py:14` (the same body as `encodec/encodec.py:14`, owned by `others`). The earlier draft's "103 assembled + 3 not-assembled = 106" guessed the gaps were the two mlx-examples lstm callsites; in fact both mlx-examples encodec sites are assembled and the real gaps are the duplicate-body sites.
-- Result-row source sha256: 119 distinct (no two assembled rows share bytes). The `vlmb/repro/` isolation files are not result rows; `repro/full.metal` repeats the failing nvfp4 source verbatim by design.
+- Result-row source sha256: 119 distinct (no two assembled rows share bytes). The `vlmb/repro/` isolation files are not result rows; `repro/full.metal` repeats the nvfp4 source verbatim by design.
 - The wwdc25 notebook callsite is counted once (file-level; one `metal_kernel()` call in one code cell).
 
 ## Failures and classification
@@ -31,7 +31,7 @@ Combined with the existing 32-kernel sibling corpus (TensorFold layout, 31 compi
 | kernel | status | cause |
 |---|---|---|
 | `nemotron_bm32_steel_linear_nt` | fixed on this branch | missing prelude. The source expands the MLX `steel/gemm` headers, which reference `complex64_t` from MLX's device-side prelude (`kernels/complex.h`), and a standalone kernel file never sees it. The shim now injects that prelude (`include/mlx_prelude.h`, ported from the pinned mlx header, plus `metal::is_convertible_v` in `include/metal_stdlib`). Row is `yes`. |
-| `quantized_verify_nvfp4_argmax_t2_k64_n64_fp16` | open, clspv optimizer bug | the translated module uses `OpSelect` whose two operands are differently typed Workgroup pointers (an element pointer and the whole `[2 x [2 x uint]]` variable), which spirv-val rejects at vulkan1.3. Evidence: the incoming LLVM IR has no pointer selects at all; clspv at its default optimization emits the bad select; `-O0` validates clean; `--spv-version=1.6` does not help. Reduced repro and a 21-case isolation matrix: `vlmb/repro/` (`repro-results.txt`). Source-level escapes that validate: hoisting the guarded threadgroup reads out of the branch, or a private array. The real fix is a clspv pass patch (or a pipeline restructure pass); out of scope for this batch. The row stays failing with the cause recorded. |
+| `quantized_verify_nvfp4_argmax_t2_k64_n64_fp16` | fixed on this branch | clspv's optimiser speculated a guarded Workgroup-array load into a select over differently typed Workgroup pointers (an element pointer and the whole `[2 x [2 x uint]]` variable), and the producer emitted that pointer select with one inferred pointee type for both operands, so spirv-val rejected the module at vulkan1.3 ("Expected both objects to be of Result Type: Select"). Evidence: the incoming LLVM IR has no pointer selects at all; `-O0` validates clean; `--spv-version=1.6` does not help. Reduced repro and a 21-case isolation matrix: `vlmb/repro/`. Fix: `sweep/guarded_wg_load_select.py` hoists the guarded Workgroup load into the branch block and turns the join phis into value selects before clspv runs (wired into `compile.sh` and `sweep/m2v_sweep.py`; a module without the shape is a no-op). Row is `yes`. |
 
 ## Integration provenance
 
@@ -45,7 +45,7 @@ Combined with the existing 32-kernel sibling corpus (TensorFold layout, 31 compi
 
 ## Re-run
 
-Fresh end-to-end re-run of all four families on this merged tree (2026-10-11): 119 rows, 118 valid, 1 open failure (the clspv OpSelect bug above). To re-validate a family:
+Fresh end-to-end re-run of all four families on this tree (2026-10-12): 119 rows, 119 valid, 0 failures. To re-validate a family:
 
 ```sh
 source /path/to/toolchain/env.sh
@@ -64,6 +64,8 @@ python3 sweep/mlx-batch/run_batch.py \
 ## CI coverage floor
 
 `sweep/check_coverage.py` is keyed to one sweep `RESULT.json` floor and does not support a second corpus directory without changing the `610` floor that the existing sweep enforces. The batch is therefore not added to the CI coverage floor. A second-corpus support change is out of scope for this task and the task forbids touching the floor.
+
+No-regression evidence for the guarded-workgroup-load pre-pass against that 610-entry corpus (2026-10-12, pinned uzu c92723bd + TensorFold f8fe17d2, `--set all`): run with the pass skipped (`M2V_KEEP_WG_GUARD=1`) and with the pass wired, then the pass applied standalone over every saved IR. 589 of 606 saved IRs are byte-identical through the pass; 17 contain the shape, are rewritten, and keep their valid status with unchanged per-entry outcomes. The only per-entry delta between the two runs was `tf/kimi/dense.metal` `k3_rows_bf16_r4/r8`, which the skipped run lost to a transient parallel clang crash ("frontend command failed due to signal") and which compiles 13/13 valid in the skipped configuration on a re-run; with that flake explained, both runs have identical results.
 
 ## Source review
 

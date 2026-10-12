@@ -23,7 +23,7 @@ quantized_verify_affine_qmv_streamed_b4_gs64_t8_k512_n64_fp16	ok
 quantized_verify_affine_qmv_token_tiled_b4_gs64_t6_k512_n64_fp16	ok	
 quantized_verify_fused_affine4_moe_hc_fp16_t2_k512_n32_e2_h2_g64	ok	
 quantized_verify_moe_hc_expand_fp16_r2_h2_d64_e2	ok	
-quantized_verify_nvfp4_argmax_t2_k64_n64_fp16	spirv-val failed	 "detail": "error: line 651: Expected both objects to be of Result Type: Select\n  %479 = OpSelect %_ptr_Workgroup__arr__arr_uint_uint_2_uint_2 %476 %478 %11"}
+quantized_verify_nvfp4_argmax_t2_k64_n64_fp16	ok	
 qwen3_5_gated_delta_with_states	ok	
 qwen3_5_gated_delta_with_states_mask	ok	
 qwen3_5_ragged_sdpa_1p_fp16_d64_v64	ok	

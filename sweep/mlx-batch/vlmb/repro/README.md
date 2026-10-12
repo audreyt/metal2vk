@@ -1,5 +1,11 @@
 # Reduced repro: clspv emits an OpSelect spirv-val rejects
 
+Status: fixed on `fix/nvfp4-select-wg` by `sweep/guarded_wg_load_select.py` (an IR pre-pass that
+hoists the guarded Workgroup load into the branch block and turns the join phis into value
+selects). `repro-results.txt` is regenerated post-fix: all 21 cases validate. The matrix below is
+the pre-fix isolation record and its statuses are what the unpatched pipeline produces (skip the
+pass with `M2V_KEEP_WG_GUARD=1` to reproduce it).
+
 Upstream finding: `quantized_verify_nvfp4_argmax` (mlx-vlm@8f5dc3d,
 mlx_vlm/models/quantized_verifier.py:1974) compiles through the m2v pipeline
 (clang, opt, patched clspv) but `spirv-val --target-env vulkan1.3` rejects the

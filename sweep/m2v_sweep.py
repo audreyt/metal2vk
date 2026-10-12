@@ -273,11 +273,18 @@ def vec_ctor_calls(text):
     same-length vectors, element list otherwise), which is exactly Metal's semantics.
     - `vec<T, N>(x)` spellings: rewritten outright (the alias cannot carry constructors).
     - `NAME(x)` for aliases declared as `using NAME = vec<...>` in the same text.
-    - `static_cast<floatN>(x)` / `static_cast<vec<...> >(x)` / alias static_casts (single argument by construction)."""
+    - `static_cast<floatN>(x)` / `static_cast<vec<...> >(x)` / alias static_casts (single argument by construction).
+    A `vec<...>(` preceded by the `operator` keyword is a conversion-operator DECLARATION (MLX's complex.h
+    `operator vec<T, 2>() const`), not a call; rewriting it would make the declaration ill-formed, so it stays."""
     names = set(VEC_ALIAS_DECL.findall(text))
-    text = VEC_CTOR_CAST.sub(lambda m: "m2v::mk<" + m.group(0).rstrip().rstrip("(") + " >(", text)
+
+    def ctor(m):
+        return m.group(0) if text[:m.start()].rstrip().endswith("operator") \
+            else "m2v::mk<" + m.group(0).rstrip().rstrip("(") + " >("
+    text = VEC_CTOR_CAST.sub(ctor, text)
     for n in sorted(names):
-        text = re.sub(r"\b%s\(" % n, "m2v::mk<%s>(" % n, text)
+        text = re.sub(r"\b%s\(" % n, lambda m, n=n: m.group(0) if text[:m.start()].rstrip().endswith("operator")
+                      else "m2v::mk<%s>(" % n, text)
     text = STATIC_VEC_CAST.sub(lambda m: "m2v::mk<" + m.group(1) + ">", text)
     return text
 
@@ -1708,6 +1715,20 @@ def process_once(setname, src_path, rel, eidx, kname, targs, outdir, include_dir
             row["ir"] = "FAIL"
             row["error"] = (out.strip().splitlines() or ["hoist_struct_ptr_args failed"])[-1][:140]
             row["features"] = ["hsp:" + norm_msg(row["error"])]
+            row["primary"] = row["features"][0]
+            return row, {}, [], m4
+        txt = ll.read_text()
+    # a guarded load from a workgroup array feeding a join phi is speculated by clspv's optimiser
+    # into a select over differently-typed workgroup pointers, which the producer emits as an
+    # ill-typed OpSelect that spirv-val rejects (the nvfp4 argmax shape); hoist the load into the
+    # branch block and select values first (a module without the shape is a no-op;
+    # M2V_KEEP_WG_GUARD=1 skips the pass)
+    if not os.environ.get("M2V_KEEP_WG_GUARD"):
+        rc, out, _ = sh([sys.executable, str(HERE / "guarded_wg_load_select.py"), str(ll)])
+        if rc != 0:
+            row["ir"] = "FAIL"
+            row["error"] = (out.strip().splitlines() or ["guarded_wg_load_select failed"])[-1][:140]
+            row["features"] = ["wgld:" + norm_msg(row["error"])]
             row["primary"] = row["features"][0]
             return row, {}, [], m4
         txt = ll.read_text()
