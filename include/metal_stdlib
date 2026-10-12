@@ -181,27 +181,29 @@ typedef __bf16 bfloat;
 struct bfloat {
   ushort bits;
   METAL_FUNC bfloat() = default;
-  METAL_FUNC bfloat(float f) {
-    const uint u = as_uint(f);
-    bits = (ushort)((u + 0x7fffu + ((u >> 16) & 1u)) >> 16);
-  }
+  // constexpr: MLX's complex.h evaluates complex arithmetic on bfloat16_t in static_asserts (mlx-core);
+  // __builtin_bit_cast is constant-evaluable, as_uint/as_float are not.
+  constexpr METAL_FUNC bfloat(float f)
+      : bits((__builtin_bit_cast(uint, f) + 0x7fffu + ((__builtin_bit_cast(uint, f) >> 16) & 1u)) >> 16) {}
+  constexpr METAL_FUNC bfloat(float f) __constant
+      : bits((__builtin_bit_cast(uint, f) + 0x7fffu + ((__builtin_bit_cast(uint, f) >> 16) & 1u)) >> 16) {}
   template <typename U> METAL_FUNC bfloat(U v) : bfloat((float)v) {}
-  METAL_FUNC operator float() const { return as_float((uint)bits << 16); }
-  METAL_FUNC operator float() const __constant { return as_float((uint)bits << 16); }
+  constexpr METAL_FUNC operator float() const { return __builtin_bit_cast(float, (uint)bits << 16); }
+  constexpr METAL_FUNC operator float() const __constant { return __builtin_bit_cast(float, (uint)bits << 16); }
 };
 #endif
 
 // Same finite set as float (8-bit exponent, 7-bit mantissa), built from raw bit patterns: max 0x7F7F, smallest
 // normal 0x0080, epsilon 0x3C00 (2^-7), denorm_min 0x0001, infinity 0x7F80, quiet NaN 0x7FC0.
 template <> struct numeric_limits<bfloat> {
-  static bfloat from_bits(ushort b) { return __builtin_bit_cast(bfloat, b); }
-  static bfloat max() { return from_bits(0x7F7F); }
-  static bfloat min() { return from_bits(0x0080); }
-  static bfloat lowest() { return from_bits(0xFF7F); }
-  static bfloat epsilon() { return from_bits(0x3C00); }
-  static bfloat denorm_min() { return from_bits(0x0001); }
-  static bfloat infinity() { return from_bits(0x7F80); }
-  static bfloat quiet_NaN() { return from_bits(0x7FC0); }
+  static constexpr bfloat from_bits(ushort b) { return __builtin_bit_cast(bfloat, b); }
+  static constexpr bfloat max() { return from_bits(0x7F7F); }
+  static constexpr bfloat min() { return from_bits(0x0080); }
+  static constexpr bfloat lowest() { return from_bits(0xFF7F); }
+  static constexpr bfloat epsilon() { return from_bits(0x3C00); }
+  static constexpr bfloat denorm_min() { return from_bits(0x0001); }
+  static constexpr bfloat infinity() { return from_bits(0x7F80); }
+  static constexpr bfloat quiet_NaN() { return from_bits(0x7FC0); }
   static constexpr bool has_infinity = true;
   static constexpr bool has_quiet_NaN = true;
 };
@@ -263,6 +265,7 @@ template <typename T, int N, typename C> METAL_FUNC vec<T, N> select(vec<T, N> f
   for (int i = 0; i < N; i++) r[i] = cond[i] ? t[i] : f[i];
   return r;
 }
+template <typename T, typename C> METAL_FUNC T select(T f, T t, C cond) { return cond ? t : f; }
 template <typename V> METAL_FUNC auto dot(V a, V b) { return ::dot(a, b); }
 #define M2V_MATH1(N) template <typename T> METAL_FUNC T N(T x) { return ::N(x); }
 M2V_MATH1(exp) M2V_MATH1(exp2) M2V_MATH1(log) M2V_MATH1(log2) M2V_MATH1(sqrt) M2V_MATH1(rsqrt) M2V_MATH1(tanh)
@@ -474,4 +477,9 @@ METAL_FUNC void simdgroup_multiply_accumulate(
 using namespace metal;
 #include "m2v_vec_ctors.h"
 #include "m2v_extra.h"
+#ifndef M2V_MLX_TREE
+// mlx_prelude.h: the MLX device-side complex prelude for assembled-kernel corpora (sweep/mlx-batch).
+// An MLX-tree TU (sweep/mlx-core) carries the real kernels/complex.h through utils.h, so injecting
+// this too would make every declaration ambiguous; M2V_MLX_TREE opts the corpus out.
 #include "mlx_prelude.h"
+#endif

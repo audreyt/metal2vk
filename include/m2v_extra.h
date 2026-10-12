@@ -75,13 +75,20 @@ template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffl
 }
 
 // ---- simd reductions and scans for every arithmetic type, bfloat, and vectors ----
+// M2V_MLX_TREE (mlx-core sweep): the TU carries MLX's own bf16_math.h, which defines these bfloat
+// overloads itself - suppress the shim's to keep one definition.
+#ifdef M2V_MLX_TREE
+#define M2V_SIMD_RED_BF(NAME, BUILTIN)
+#else
+#define M2V_SIMD_RED_BF(NAME, BUILTIN) METAL_FUNC bfloat NAME(bfloat x) { return bfloat(BUILTIN((float)x)); }
+#endif
 #define M2V_SIMD_RED(NAME, BUILTIN)                                                                                    \
   template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> NAME(T x) {                                      \
     static_assert(sizeof(T) <= 4, "simd reductions and scans on 64-bit types are not supported: the value would be truncated to 32 bits"); \
     using W = conditional_t<__is_integral(T), conditional_t<__is_signed(T), int, uint>, float>;                        \
     return (T)BUILTIN((W)x);                                                                                            \
   }                                                                                                                    \
-  METAL_FUNC bfloat NAME(bfloat x) { return bfloat(BUILTIN((float)x)); }                                               \
+  M2V_SIMD_RED_BF(NAME, BUILTIN)                                                                                       \
   template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V) && !is_same_v<V, bfloat>, V> NAME(V x) {            \
     V r;                                                                                                               \
     for (int i = 0; i < (int)__builtin_vectorelements(V); i++) r[i] = NAME(x[i]);                                      \
@@ -206,9 +213,74 @@ template <typename T, size_t N> struct array {
 
 // ---- Apple built-ins that standard-library headers wrap (glm_glue.metal re-declares bfloat math through them) ----
 #define __METAL_MAYBE_FAST_MATH__ 0
+#define __METAL_FAST_MATH__ 0
+#define __METAL_PRECISE_MATH__ 0
 #define M2V_BUILTIN1(N, F) template <typename T> METAL_FUNC T __metal_##N(T x, int) { return F(x); }
 M2V_BUILTIN1(fabs, ::fabs) M2V_BUILTIN1(exp, ::exp) M2V_BUILTIN1(exp2, ::exp2) M2V_BUILTIN1(log, ::log) M2V_BUILTIN1(log2, ::log2)
 M2V_BUILTIN1(sqrt, ::sqrt) M2V_BUILTIN1(rsqrt, ::rsqrt) M2V_BUILTIN1(tanh, ::tanh) M2V_BUILTIN1(sin, ::sin) M2V_BUILTIN1(cos, ::cos)
+
+// ---- The rest of Apple's internals MLX's bf16_math.h and steel nax.h call: the trailing int is Metal's
+// fast-math flag (one precision here) and arity follows the internal spellings. The simd forms the OpenCL
+// headers lack are butterflies / Hillis-Steele over sub_group_shuffle, exact for a power-of-two simdgroup.
+#define M2V_BUILTIN2(N, F) template <typename T> METAL_FUNC T __metal_##N(T x, T y, int) { return F(x, y); }
+M2V_BUILTIN1(acos, ::acos) M2V_BUILTIN1(acosh, ::acosh) M2V_BUILTIN1(asin, ::asin) M2V_BUILTIN1(asinh, ::asinh)
+M2V_BUILTIN1(atan, ::atan) M2V_BUILTIN1(atanh, ::atanh) M2V_BUILTIN1(ceil, ::ceil) M2V_BUILTIN1(cosh, ::cosh) M2V_BUILTIN1(sinh, ::sinh) M2V_BUILTIN1(tan, ::tan)
+M2V_BUILTIN1(exp10, ::exp10) M2V_BUILTIN1(floor, ::floor) M2V_BUILTIN1(log10, ::log10) M2V_BUILTIN1(rint, ::rint)
+M2V_BUILTIN1(round, ::round) M2V_BUILTIN1(trunc, ::trunc) M2V_BUILTIN1(cospi, ::cospi) M2V_BUILTIN1(sinpi, ::sinpi)
+M2V_BUILTIN1(tanpi, ::tanpi) M2V_BUILTIN2(atan2, ::atan2) M2V_BUILTIN2(fmax, ::fmax) M2V_BUILTIN2(fmin, ::fmin)
+M2V_BUILTIN2(fmod, ::fmod) M2V_BUILTIN2(pow, ::pow) M2V_BUILTIN2(powr, ::powr)
+template <typename T> METAL_FUNC T __metal_fract(T x, int) { T ip; return ::fract(x, &ip); }
+template <typename T> METAL_FUNC T __metal_fma(T x, T y, T z) { return ::fma(x, y, z); }
+template <typename T> METAL_FUNC T __metal_nextafter(T x, T y) { return ::nextafter(x, y); }
+template <typename T> METAL_FUNC T __metal_divide(T x, T y, int) { return x / y; }
+template <typename T> METAL_FUNC T __metal_ldexp(T x, int k, int) { return ::ldexp(x, k); }
+template <typename T, typename E> METAL_FUNC T __metal_frexp(T x, E* e) { return ::frexp(x, e); }
+template <typename T> METAL_FUNC T __metal_fmax3(T x, T y, T z, int) { return ::fmax(::fmax(x, y), z); }
+template <typename T> METAL_FUNC T __metal_fmin3(T x, T y, T z, int) { return ::fmin(::fmin(x, y), z); }
+template <typename T> METAL_FUNC T __metal_fmedian3(T x, T y, T z, int) { return __metal_fmax(__metal_fmin(x, y, 0), __metal_fmin(__metal_fmax(x, y, 0), z, 0), 0); }
+METAL_FUNC uint __metal_get_thread_index_in_simdgroup() { return get_sub_group_local_id(); }
+METAL_FUNC uint __metal_get_simdgroup_size(ushort) { return get_sub_group_size(); }
+template <typename T> METAL_FUNC T __metal_simd_broadcast(T x, ushort l) { return simd_broadcast(x, l); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle(T x, ushort l) { return simd_shuffle(x, l); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_xor(T x, ushort m) { return simd_shuffle_xor(x, m); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_up(T x, ushort d) { return simd_shuffle_up(x, d); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_down(T x, ushort d) { return simd_shuffle_down(x, d); }
+template <typename T> METAL_FUNC T __metal_simd_sum(T x) { return simd_sum(x); }
+template <typename T> METAL_FUNC T __metal_simd_max(T x) { return simd_max(x); }
+template <typename T> METAL_FUNC T __metal_simd_min(T x) { return simd_min(x); }
+template <typename T> METAL_FUNC T __metal_simd_prefix_inclusive_sum(T x) { return simd_prefix_inclusive_sum(x); }
+template <typename T> METAL_FUNC T __metal_simd_prefix_exclusive_sum(T x) { return simd_prefix_exclusive_sum(x); }
+template <typename T> METAL_FUNC T __metal_simd_product(T x) { for (uint o = (uint)get_sub_group_size() >> 1; o; o >>= 1) x *= sub_group_shuffle_xor(x, o); return x; }
+template <typename T> METAL_FUNC T __metal_simd_xor(T x) { using I = conditional_t<sizeof(T) <= 2, short, conditional_t<sizeof(T) == 8, long, int>>; I v = __builtin_astype(x, I); for (uint o = (uint)get_sub_group_size() >> 1; o; o >>= 1) v ^= sub_group_shuffle_xor(v, o); return __builtin_astype(v, T); }
+template <typename T> METAL_FUNC T __metal_simd_prefix_inclusive_product(T x) { const uint l = get_sub_group_local_id(); for (uint o = 1u; o < (uint)get_sub_group_size(); o <<= 1) { T y = l >= o ? sub_group_shuffle(x, l - o) : (T)1; x *= y; } return x; }
+template <typename T> METAL_FUNC T __metal_simd_prefix_exclusive_product(T x) { const uint l = get_sub_group_local_id(); T i = __metal_simd_prefix_inclusive_product(x); return l ? sub_group_shuffle(i, l - 1) : (T)1; }
+// ---- simd_shuffle_and_fill / rotate: no OpenCL builtin; exact for a power-of-two simdgroup over sub_group_shuffle
+// (every out-of-block lane read is discarded by the guard). Metal: fill puts `filling` where the shift reads past the
+// block edge; rotate wraps around the block edge.
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_and_fill_up(T x, T f, ushort d, ushort m) { const uint l = get_sub_group_local_id(); return (l % m) >= d ? sub_group_shuffle(x, l - d) : f; }
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_and_fill_up(T x, T f, ushort d) { return simd_shuffle_and_fill_up(x, f, d, (ushort)get_sub_group_size()); }
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_and_fill_down(T x, T f, ushort d, ushort m) { const uint l = get_sub_group_local_id(); return (m - (l % m)) > d ? sub_group_shuffle(x, l + d) : f; }
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_and_fill_down(T x, T f, ushort d) { return simd_shuffle_and_fill_down(x, f, d, (ushort)get_sub_group_size()); }
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_rotate_up(T x, ushort d, ushort m) { const uint l = get_sub_group_local_id(); return (l % m) >= d ? sub_group_shuffle(x, l - d) : sub_group_shuffle(x, l - d + m); }
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_rotate_up(T x, ushort d) { return simd_shuffle_rotate_up(x, d, (ushort)get_sub_group_size()); }
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_rotate_down(T x, ushort d, ushort m) { const uint l = get_sub_group_local_id(); return (l % m) + d < m ? sub_group_shuffle(x, l + d) : sub_group_shuffle(x, l + d - m); }
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_rotate_down(T x, ushort d) { return simd_shuffle_rotate_down(x, d, (ushort)get_sub_group_size()); }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_and_fill_up(V x, V f, ushort d, ushort m) { V r; for (int i = 0; i < (int)__builtin_vectorelements(V); i++) r[i] = simd_shuffle_and_fill_up(x[i], f[i], d, m); return r; }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_and_fill_up(V x, V f, ushort d) { return simd_shuffle_and_fill_up(x, f, d, (ushort)get_sub_group_size()); }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_and_fill_down(V x, V f, ushort d, ushort m) { V r; for (int i = 0; i < (int)__builtin_vectorelements(V); i++) r[i] = simd_shuffle_and_fill_down(x[i], f[i], d, m); return r; }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_and_fill_down(V x, V f, ushort d) { return simd_shuffle_and_fill_down(x, f, d, (ushort)get_sub_group_size()); }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_rotate_up(V x, ushort d, ushort m) { V r; for (int i = 0; i < (int)__builtin_vectorelements(V); i++) r[i] = simd_shuffle_rotate_up(x[i], d, m); return r; }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_rotate_up(V x, ushort d) { return simd_shuffle_rotate_up(x, d, (ushort)get_sub_group_size()); }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_rotate_down(V x, ushort d, ushort m) { V r; for (int i = 0; i < (int)__builtin_vectorelements(V); i++) r[i] = simd_shuffle_rotate_down(x[i], d, m); return r; }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_rotate_down(V x, ushort d) { return simd_shuffle_rotate_down(x, d, (ushort)get_sub_group_size()); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_and_fill_up(T x, T f, ushort d, ushort m) { return simd_shuffle_and_fill_up(x, f, d, m); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_and_fill_up(T x, T f, ushort d) { return simd_shuffle_and_fill_up(x, f, d); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_and_fill_down(T x, T f, ushort d, ushort m) { return simd_shuffle_and_fill_down(x, f, d, m); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_and_fill_down(T x, T f, ushort d) { return simd_shuffle_and_fill_down(x, f, d); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_rotate_up(T x, ushort d, ushort m) { return simd_shuffle_rotate_up(x, d, m); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_rotate_up(T x, ushort d) { return simd_shuffle_rotate_up(x, d); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_rotate_down(T x, ushort d, ushort m) { return simd_shuffle_rotate_down(x, d, m); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_rotate_down(T x, ushort d) { return simd_shuffle_rotate_down(x, d); }
 
 } // namespace metal
 
@@ -272,9 +344,74 @@ template <typename T, size_t N> struct array {
 
 // ---- Apple built-ins that standard-library headers wrap (glm_glue.metal re-declares bfloat math through them) ----
 #define __METAL_MAYBE_FAST_MATH__ 0
+#define __METAL_FAST_MATH__ 0
+#define __METAL_PRECISE_MATH__ 0
 #define M2V_BUILTIN1(N, F) template <typename T> METAL_FUNC T __metal_##N(T x, int) { return F(x); }
 M2V_BUILTIN1(fabs, ::fabs) M2V_BUILTIN1(exp, ::exp) M2V_BUILTIN1(exp2, ::exp2) M2V_BUILTIN1(log, ::log) M2V_BUILTIN1(log2, ::log2)
 M2V_BUILTIN1(sqrt, ::sqrt) M2V_BUILTIN1(rsqrt, ::rsqrt) M2V_BUILTIN1(tanh, ::tanh) M2V_BUILTIN1(sin, ::sin) M2V_BUILTIN1(cos, ::cos)
+
+// ---- The rest of Apple's internals MLX's bf16_math.h and steel nax.h call: the trailing int is Metal's
+// fast-math flag (one precision here) and arity follows the internal spellings. The simd forms the OpenCL
+// headers lack are butterflies / Hillis-Steele over sub_group_shuffle, exact for a power-of-two simdgroup.
+#define M2V_BUILTIN2(N, F) template <typename T> METAL_FUNC T __metal_##N(T x, T y, int) { return F(x, y); }
+M2V_BUILTIN1(acos, ::acos) M2V_BUILTIN1(acosh, ::acosh) M2V_BUILTIN1(asin, ::asin) M2V_BUILTIN1(asinh, ::asinh)
+M2V_BUILTIN1(atan, ::atan) M2V_BUILTIN1(atanh, ::atanh) M2V_BUILTIN1(ceil, ::ceil) M2V_BUILTIN1(cosh, ::cosh) M2V_BUILTIN1(sinh, ::sinh) M2V_BUILTIN1(tan, ::tan)
+M2V_BUILTIN1(exp10, ::exp10) M2V_BUILTIN1(floor, ::floor) M2V_BUILTIN1(log10, ::log10) M2V_BUILTIN1(rint, ::rint)
+M2V_BUILTIN1(round, ::round) M2V_BUILTIN1(trunc, ::trunc) M2V_BUILTIN1(cospi, ::cospi) M2V_BUILTIN1(sinpi, ::sinpi)
+M2V_BUILTIN1(tanpi, ::tanpi) M2V_BUILTIN2(atan2, ::atan2) M2V_BUILTIN2(fmax, ::fmax) M2V_BUILTIN2(fmin, ::fmin)
+M2V_BUILTIN2(fmod, ::fmod) M2V_BUILTIN2(pow, ::pow) M2V_BUILTIN2(powr, ::powr)
+template <typename T> METAL_FUNC T __metal_fract(T x, int) { T ip; return ::fract(x, &ip); }
+template <typename T> METAL_FUNC T __metal_fma(T x, T y, T z) { return ::fma(x, y, z); }
+template <typename T> METAL_FUNC T __metal_nextafter(T x, T y) { return ::nextafter(x, y); }
+template <typename T> METAL_FUNC T __metal_divide(T x, T y, int) { return x / y; }
+template <typename T> METAL_FUNC T __metal_ldexp(T x, int k, int) { return ::ldexp(x, k); }
+template <typename T, typename E> METAL_FUNC T __metal_frexp(T x, E* e) { return ::frexp(x, e); }
+template <typename T> METAL_FUNC T __metal_fmax3(T x, T y, T z, int) { return ::fmax(::fmax(x, y), z); }
+template <typename T> METAL_FUNC T __metal_fmin3(T x, T y, T z, int) { return ::fmin(::fmin(x, y), z); }
+template <typename T> METAL_FUNC T __metal_fmedian3(T x, T y, T z, int) { return __metal_fmax(__metal_fmin(x, y, 0), __metal_fmin(__metal_fmax(x, y, 0), z, 0), 0); }
+METAL_FUNC uint __metal_get_thread_index_in_simdgroup() { return get_sub_group_local_id(); }
+METAL_FUNC uint __metal_get_simdgroup_size(ushort) { return get_sub_group_size(); }
+template <typename T> METAL_FUNC T __metal_simd_broadcast(T x, ushort l) { return simd_broadcast(x, l); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle(T x, ushort l) { return simd_shuffle(x, l); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_xor(T x, ushort m) { return simd_shuffle_xor(x, m); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_up(T x, ushort d) { return simd_shuffle_up(x, d); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_down(T x, ushort d) { return simd_shuffle_down(x, d); }
+template <typename T> METAL_FUNC T __metal_simd_sum(T x) { return simd_sum(x); }
+template <typename T> METAL_FUNC T __metal_simd_max(T x) { return simd_max(x); }
+template <typename T> METAL_FUNC T __metal_simd_min(T x) { return simd_min(x); }
+template <typename T> METAL_FUNC T __metal_simd_prefix_inclusive_sum(T x) { return simd_prefix_inclusive_sum(x); }
+template <typename T> METAL_FUNC T __metal_simd_prefix_exclusive_sum(T x) { return simd_prefix_exclusive_sum(x); }
+template <typename T> METAL_FUNC T __metal_simd_product(T x) { for (uint o = (uint)get_sub_group_size() >> 1; o; o >>= 1) x *= sub_group_shuffle_xor(x, o); return x; }
+template <typename T> METAL_FUNC T __metal_simd_xor(T x) { using I = conditional_t<sizeof(T) <= 2, short, conditional_t<sizeof(T) == 8, long, int>>; I v = __builtin_astype(x, I); for (uint o = (uint)get_sub_group_size() >> 1; o; o >>= 1) v ^= sub_group_shuffle_xor(v, o); return __builtin_astype(v, T); }
+template <typename T> METAL_FUNC T __metal_simd_prefix_inclusive_product(T x) { const uint l = get_sub_group_local_id(); for (uint o = 1u; o < (uint)get_sub_group_size(); o <<= 1) { T y = l >= o ? sub_group_shuffle(x, l - o) : (T)1; x *= y; } return x; }
+template <typename T> METAL_FUNC T __metal_simd_prefix_exclusive_product(T x) { const uint l = get_sub_group_local_id(); T i = __metal_simd_prefix_inclusive_product(x); return l ? sub_group_shuffle(i, l - 1) : (T)1; }
+// ---- simd_shuffle_and_fill / rotate: no OpenCL builtin; exact for a power-of-two simdgroup over sub_group_shuffle
+// (every out-of-block lane read is discarded by the guard). Metal: fill puts `filling` where the shift reads past the
+// block edge; rotate wraps around the block edge.
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_and_fill_up(T x, T f, ushort d, ushort m) { const uint l = get_sub_group_local_id(); return (l % m) >= d ? sub_group_shuffle(x, l - d) : f; }
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_and_fill_up(T x, T f, ushort d) { return simd_shuffle_and_fill_up(x, f, d, (ushort)get_sub_group_size()); }
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_and_fill_down(T x, T f, ushort d, ushort m) { const uint l = get_sub_group_local_id(); return (m - (l % m)) > d ? sub_group_shuffle(x, l + d) : f; }
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_and_fill_down(T x, T f, ushort d) { return simd_shuffle_and_fill_down(x, f, d, (ushort)get_sub_group_size()); }
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_rotate_up(T x, ushort d, ushort m) { const uint l = get_sub_group_local_id(); return (l % m) >= d ? sub_group_shuffle(x, l - d) : sub_group_shuffle(x, l - d + m); }
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_rotate_up(T x, ushort d) { return simd_shuffle_rotate_up(x, d, (ushort)get_sub_group_size()); }
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_rotate_down(T x, ushort d, ushort m) { const uint l = get_sub_group_local_id(); return (l % m) + d < m ? sub_group_shuffle(x, l + d) : sub_group_shuffle(x, l + d - m); }
+template <typename T> METAL_FUNC enable_if_t<__is_arithmetic(T), T> simd_shuffle_rotate_down(T x, ushort d) { return simd_shuffle_rotate_down(x, d, (ushort)get_sub_group_size()); }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_and_fill_up(V x, V f, ushort d, ushort m) { V r; for (int i = 0; i < (int)__builtin_vectorelements(V); i++) r[i] = simd_shuffle_and_fill_up(x[i], f[i], d, m); return r; }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_and_fill_up(V x, V f, ushort d) { return simd_shuffle_and_fill_up(x, f, d, (ushort)get_sub_group_size()); }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_and_fill_down(V x, V f, ushort d, ushort m) { V r; for (int i = 0; i < (int)__builtin_vectorelements(V); i++) r[i] = simd_shuffle_and_fill_down(x[i], f[i], d, m); return r; }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_and_fill_down(V x, V f, ushort d) { return simd_shuffle_and_fill_down(x, f, d, (ushort)get_sub_group_size()); }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_rotate_up(V x, ushort d, ushort m) { V r; for (int i = 0; i < (int)__builtin_vectorelements(V); i++) r[i] = simd_shuffle_rotate_up(x[i], d, m); return r; }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_rotate_up(V x, ushort d) { return simd_shuffle_rotate_up(x, d, (ushort)get_sub_group_size()); }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_rotate_down(V x, ushort d, ushort m) { V r; for (int i = 0; i < (int)__builtin_vectorelements(V); i++) r[i] = simd_shuffle_rotate_down(x[i], d, m); return r; }
+template <typename V> METAL_FUNC enable_if_t<!__is_arithmetic(V), V> simd_shuffle_rotate_down(V x, ushort d) { return simd_shuffle_rotate_down(x, d, (ushort)get_sub_group_size()); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_and_fill_up(T x, T f, ushort d, ushort m) { return simd_shuffle_and_fill_up(x, f, d, m); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_and_fill_up(T x, T f, ushort d) { return simd_shuffle_and_fill_up(x, f, d); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_and_fill_down(T x, T f, ushort d, ushort m) { return simd_shuffle_and_fill_down(x, f, d, m); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_and_fill_down(T x, T f, ushort d) { return simd_shuffle_and_fill_down(x, f, d); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_rotate_up(T x, ushort d, ushort m) { return simd_shuffle_rotate_up(x, d, m); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_rotate_up(T x, ushort d) { return simd_shuffle_rotate_up(x, d); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_rotate_down(T x, ushort d, ushort m) { return simd_shuffle_rotate_down(x, d, m); }
+template <typename T> METAL_FUNC T __metal_simd_shuffle_rotate_down(T x, ushort d) { return simd_shuffle_rotate_down(x, d); }
 
 } // namespace metal
 
