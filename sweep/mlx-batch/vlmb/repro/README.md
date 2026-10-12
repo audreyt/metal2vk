@@ -1,10 +1,13 @@
 # Reduced repro: clspv emits an OpSelect spirv-val rejects
 
-Status: fixed on `fix/nvfp4-select-wg` by `sweep/guarded_wg_load_select.py` (an IR pre-pass that
-hoists the guarded Workgroup load into the branch block and turns the join phis into value
-selects). `repro-results.txt` is regenerated post-fix: all 21 cases validate. The matrix below is
-the pre-fix isolation record and its statuses are what the unpatched pipeline produces (skip the
-pass with `M2V_KEEP_WG_GUARD=1` to reproduce it).
+Status: **unresolved**. Unpatched pipeline still emits an invalid pointer `OpSelect`;
+`spirv-val --target-env vulkan1.3` rejects the module. Former "fix"
+`sweep/guarded_wg_load_select.py` (and `M2V_KEEP_WG_GUARD`) is removed: it hoisted the
+guarded Workgroup load past the bound check — Trellis `partials[lane]` outside
+`lane < 16` on a 16-element WG array; Weaver the same with `lane < 8`. Post-pass
+"all 21 validate" was compiler-only and did not prove bounds or numerics.
+
+Matrix below is the isolation record for the unpatched pipeline.
 
 Upstream finding: `quantized_verify_nvfp4_argmax` (mlx-vlm@8f5dc3d,
 mlx_vlm/models/quantized_verifier.py:1974) compiles through the m2v pipeline
@@ -53,10 +56,9 @@ group_indices[group];` before the `if`) makes the module validate (v7, v10).
 Replacing the threadgroup array with a private int array also validates (v12).
 The IR pipeline stages are clang -O0, then
 `opt -passes='cgscc(inline),function(sroa,early-cse,simplifycfg)'
--inline-threshold=100000`, then clspv; the pointer select that becomes the
-rejected OpSelect reaches clspv's input already as a select over
-workgroup-array pointers, so the malformed type pairing appears during clspv's
-lowering of that select.
+-inline-threshold=100000`, then clspv. Pinned LLVM keeps a branch + phi over the
+guarded Workgroup load (no pointer selects in that IR); clspv lowers the shape
+into the ill-typed Workgroup pointer `OpSelect` spirv-val rejects.
 
 ## Variant matrix (repro-results.txt, one line per case)
 
@@ -97,4 +99,5 @@ Reading of the axes:
   another) - v20 is the smallest failing combination of those.
 
 Toolchain: LLVM 23.1.1 clang/opt, clspv from the m2v build, host x86-64 Linux.
-No GPU execution involved; this is compile-plus-validation only.
+No GPU execution involved; this is compile-plus-validation only. Compiler-only
+validity does not prove Workgroup bounds or numerics.

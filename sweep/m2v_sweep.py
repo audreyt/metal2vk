@@ -1751,20 +1751,6 @@ def process_once(setname, src_path, rel, eidx, kname, targs, outdir, include_dir
             row["primary"] = row["features"][0]
             return row, {}, [], m4
         txt = ll.read_text()
-    # a guarded load from a workgroup array feeding a join phi is speculated by clspv's optimiser
-    # into a select over differently-typed workgroup pointers, which the producer emits as an
-    # ill-typed OpSelect that spirv-val rejects (the nvfp4 argmax shape); hoist the load into the
-    # branch block and select values first (a module without the shape is a no-op;
-    # M2V_KEEP_WG_GUARD=1 skips the pass)
-    if not os.environ.get("M2V_KEEP_WG_GUARD"):
-        rc, out, _ = sh([sys.executable, str(HERE / "guarded_wg_load_select.py"), str(ll)])
-        if rc != 0:
-            row["ir"] = "FAIL"
-            row["error"] = (out.strip().splitlines() or ["guarded_wg_load_select failed"])[-1][:140]
-            row["features"] = ["wgld:" + norm_msg(row["error"])]
-            row["primary"] = row["features"][0]
-            return row, {}, [], m4
-        txt = ll.read_text()
     spv = d / "spv" / (tag + ".spv")
     spv.parent.mkdir(parents=True, exist_ok=True)
     psb = psb_case(tag)

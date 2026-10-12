@@ -6,7 +6,9 @@ per-family results tables, a combined `results-all.tsv`, and this summary. Each 
 names its upstream callsite and representative call contract in a header comment. The sources are
 compile-tested only; no GPU dispatch is performed.
 
-## Top-level counts (this batch only)
+## Top-level counts (historical batch snapshot)
+
+Historical assemble/compile batch as integrated (not a live re-measure):
 
 | family | sources | valid (spirv-val vulkan1.3) | failed | results file |
 |---|---:|---:|---:|---|
@@ -16,7 +18,9 @@ compile-tested only; no GPU dispatch is performed.
 | others (mlx-lm / mlx-examples / mlx-audio) | 16 | 16 | 0 | `others/results-others.tsv` |
 | **batch total (assembled)** | **119** | **119** | **0** | `results-all.tsv` |
 
-Combined with the existing 32-kernel sibling corpus (TensorFold layout, 31 compile-valid, 1 needs M5 tensor ops): 119 + 31 = **150 valid**, 119 + 32 = **151 total**.
+Historical sibling combine (same snapshot era): existing 32-kernel corpus (TensorFold layout, 31 compile-valid, 1 needs M5 tensor ops): 119 + 31 = **150 valid**, 119 + 32 = **151 total**. Compiler-only `spirv-val` success does not prove Workgroup bounds or numerics.
+
+**Unresolved:** `quantized_verify_nvfp4_argmax_t2_k64_n64_fp16` still fails with an invalid pointer `OpSelect` on the unpatched pipeline. Historical "119 valid / 0 failures" assumed the removed WG-load pre-pass (see Failures).
 
 ## Denominators
 
@@ -31,7 +35,7 @@ Combined with the existing 32-kernel sibling corpus (TensorFold layout, 31 compi
 | kernel | status | cause |
 |---|---|---|
 | `nemotron_bm32_steel_linear_nt` | fixed on this branch | missing prelude. The source expands the MLX `steel/gemm` headers, which reference `complex64_t` from MLX's device-side prelude (`kernels/complex.h`), and a standalone kernel file never sees it. The shim now injects that prelude (`include/mlx_prelude.h`, ported from the pinned mlx header, plus `metal::is_convertible_v` in `include/metal_stdlib`). Row is `yes`. |
-| `quantized_verify_nvfp4_argmax_t2_k64_n64_fp16` | fixed on this branch | clspv's optimiser speculated a guarded Workgroup-array load into a select over differently typed Workgroup pointers (an element pointer and the whole `[2 x [2 x uint]]` variable), and the producer emitted that pointer select with one inferred pointee type for both operands, so spirv-val rejected the module at vulkan1.3 ("Expected both objects to be of Result Type: Select"). Evidence: the incoming LLVM IR has no pointer selects at all; `-O0` validates clean; `--spv-version=1.6` does not help. Reduced repro and a 21-case isolation matrix: `vlmb/repro/`. Fix: `sweep/guarded_wg_load_select.py` hoists the guarded Workgroup load into the branch block and turns the join phis into value selects before clspv runs (wired into `compile.sh` and `sweep/m2v_sweep.py`; a module without the shape is a no-op). Row is `yes`. |
+| `quantized_verify_nvfp4_argmax_t2_k64_n64_fp16` | **unresolved** | clspv lowers a guarded Workgroup-array load (LLVM branch + phi join) into a select over differently typed Workgroup pointers (element pointer vs whole `[2 x [2 x uint]]` variable) and emits that pointer select with one inferred pointee type, so spirv-val rejects at vulkan1.3 ("Expected both objects to be of Result Type: Select"). Pinned evidence: incoming LLVM IR is branch/phi (no pointer selects); `-O0` validates clean; `--spv-version=1.6` does not help. Reduced repro + 21-case matrix: `vlmb/repro/`. Former pre-pass `sweep/guarded_wg_load_select.py` (and `M2V_KEEP_WG_GUARD`) is removed: it hoisted the load past the guard and OOB-read Workgroup memory — Trellis `partials[lane]` outside `lane < 16` on a 16-element WG array; Weaver the same with `lane < 8`. Without it, nvfp4 is still the invalid pointer `OpSelect`. Historical compile-`yes` was not a bounds/numerics proof. |
 
 ## Integration provenance
 
@@ -45,7 +49,7 @@ Combined with the existing 32-kernel sibling corpus (TensorFold layout, 31 compi
 
 ## Re-run
 
-Fresh end-to-end re-run of all four families on this tree (2026-10-12): 119 rows, 119 valid, 0 failures. To re-validate a family:
+**Historical** (2026-10-12, WG-load pre-pass still wired): 119 rows, 119 valid, 0 failures. Without that pass, nvfp4 is invalid pointer `OpSelect` again. To re-validate a family:
 
 ```sh
 source /path/to/toolchain/env.sh
@@ -59,13 +63,15 @@ python3 sweep/mlx-batch/run_batch.py \
   --results sweep/mlx-batch/<family>/results-<family>.tsv
 ```
 
-`run_batch.py` reads the `// Origin:` and `// Representative call:` header comments, compiles each `.metal` with `tools/m2v-compile`, validates the produced SPIR-V with `spirv-val --target-env vulkan1.3`, and writes a per-row result line. It scans `--msl-dir` non-recursively, so the top-level call (`--msl-dir sweep/mlx-batch`) compiles exactly the 14 top rows and a family call compiles exactly that family's own sources (the nested `vlmA/`, `vlmb/`, `others/`, `vlmb/repro/` directories keep their own tables and runners). The `vlmA`, `vlmb` and `others` families document their own assembler commands in their READMEs; `vlmb` regenerates byte-identically from its committed specs.
+`run_batch.py` reads the `// Origin:` and `// Representative call:` header comments, compiles each `.metal` with `tools/m2v-compile`, validates the produced SPIR-V with `spirv-val --target-env vulkan1.3`, and writes a per-row result line. It scans `--msl-dir` non-recursively, so the top-level call (`--msl-dir sweep/mlx-batch`) compiles exactly the 14 top rows and a family call compiles exactly that family's own sources (the nested `vlmA/`, `vlmb/`, `others/`, `vlmb/repro/` directories keep their own tables and runners). The `vlmA`, `vlmb` and `others` families document their own assembler commands in their READMEs; `vlmb` regenerates byte-identically from its committed specs. Compile-only validity still does not prove Workgroup bounds or GPU numerics.
 
 ## CI coverage floor
 
 `sweep/check_coverage.py` is keyed to one sweep `RESULT.json` floor and does not support a second corpus directory without changing the `610` floor that the existing sweep enforces. The batch is therefore not added to the CI coverage floor. A second-corpus support change is out of scope for this task and the task forbids touching the floor.
 
-No-regression evidence for the guarded-workgroup-load pre-pass against that 610-entry corpus (2026-10-12, pinned uzu c92723bd + TensorFold f8fe17d2, `--set all`): run with the pass skipped (`M2V_KEEP_WG_GUARD=1`) and with the pass wired, then the pass applied standalone over every saved IR. 591 of 608 saved IRs are byte-identical through the pass; 17 contain the shape - 17 entries over 11 source files (`uzu`: trellis, gdn chunked output-and-state, gdn norm-gate, gdn tree-verify out, gdn update, normalization, radix-top-k-small, unified-sampling, weaver top-children; `tf`: moe-route route-select, argmax bf16-part) - are rewritten, and keep `val=ok` with unchanged per-entry outcomes. Volatile Workgroup loads never match the pass (see `sweep/tests/wg_volatile_skip.ll`). The only per-entry delta between the two runs was `tf/kimi/dense.metal` `k3_rows_bf16_r4/r8`, which the skipped run lost to a transient parallel clang crash ("frontend command failed due to signal") and which compiles 13/13 valid in the skipped configuration on a re-run; with that flake explained, both runs have identical results.
+### Removed guarded-WG-load pre-pass
+
+`sweep/guarded_wg_load_select.py` / `M2V_KEEP_WG_GUARD` removed (bounds reason under Failures: Trellis/Weaver OOB). **Historical** (2026-10-12, uzu c92723bd + TensorFold f8fe17d2, `--set all`): 591/608 saved IRs byte-identical through the pass; **17** entries over 11 sources rewritten (`uzu`: trellis, gdn chunked output-and-state, gdn norm-gate, gdn tree-verify out, gdn update, normalization, radix-top-k-small, unified-sampling, weaver top-children; `tf`: moe-route route-select, argmax bf16-part) still reported compile `val=ok`. Volatile WG loads were non-matches (`sweep/tests/wg_volatile_skip.ll`). Flake note: `tf/kimi/dense.metal` `k3_rows_bf16_r4/r8` hit a transient parallel clang crash on one skipped run and compiled clean on re-run. Those historical rewrite/`val=ok` counts are not a bounds or numerics proof — the 17 included the Trellis/Weaver OOB shapes.
 
 ## Source review
 
