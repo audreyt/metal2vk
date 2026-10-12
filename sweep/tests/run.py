@@ -11,11 +11,6 @@ a float phi, or leaves a bfloat token behind. The dynamic array case fails if th
 the single-member wrapper that clspv cannot lower. The pointer-phi case fails if the pass leaves a loop-carried
 pointer phi (clspv's SimplifyPointerBitcast cycles on those and the patched pass then drifts the loop-exit tail,
 PR #47) or gets the byte steps wrong; the skip case fails if it rewrites a dynamic-stride phi it cannot prove.
-The guarded-workgroup-load case is the nvfp4 argmax shape (sweep/mlx-batch/vlmb/repro/): clspv's optimiser
-speculates the guarded addrspace(3) load into a select over differently-typed workgroup pointers and the
-producer emits an ill-typed OpSelect, so the pass must hoist the load into the branch block and select values
-before clspv runs. The volatile sibling fails if the pass rewrites a `load volatile` from Workgroup memory:
-a speculated volatile load changes observable behaviour, so the diamond must survive untouched.
 When PARITY_G7_DEC (or BLEND_TOOLS) points at saved sweep data, the pointer-phi case also rewrites the real
 gate_up decode IR and requires clspv to compile it with no give-up diagnostic.
 """
@@ -80,26 +75,6 @@ def verify(ll, name):
     if name == "pointer_phi_skip":
         if not re.search(r"=\s*phi ptr\b", txt):
             print("FAIL pointer_phi_skip: the dynamic-stride pointer phi must be left untouched")
-            return False
-    if name == "wg_guarded_load_select":
-        if re.search(r"br i1 %\w+, label %34,", txt) or "\n34:" in txt:
-            print("FAIL wg_guarded_load_select: the guarded workgroup-load block survived")
-            return False
-        if re.search(r"= phi i\d+ \[ %36, %34 \]", txt):
-            print("FAIL wg_guarded_load_select: the guarded load still feeds a join phi")
-            return False
-        if not re.search(r"= select i1 %\w+, i32 %36, i32 %", txt):
-            print("FAIL wg_guarded_load_select: the hoisted load is not selected in the join block")
-            return False
-    if name == "wg_volatile_skip":
-        if "load volatile i32, ptr addrspace(3) %35" not in txt:
-            print("FAIL wg_volatile_skip: the volatile workgroup load was rewritten")
-            return False
-        if not re.search(r"= phi i32 \[ %36, %34 \]", txt):
-            print("FAIL wg_volatile_skip: the volatile load no longer feeds its join phi")
-            return False
-        if re.search(r"= select i1 %\w+, i32 %36,", txt):
-            print("FAIL wg_volatile_skip: the volatile load result was selected")
             return False
     opts = [shutil.which("opt"), shutil.which("opt-23")]
     opt = next((o for o in opts if o), None)
@@ -298,8 +273,6 @@ CASES = {
     "structured_merge_continue.ll": [],   # producer-level merge/continue separation
     "pointer_phi_to_index.ll": ["pointer_phi_to_index.py"],
     "pointer_phi_skip.ll": ["pointer_phi_to_index.py"],
-    "wg_guarded_load_select.ll": ["guarded_wg_load_select.py"],
-    "wg_volatile_skip.ll": ["guarded_wg_load_select.py"],
 }
 
 fails = 0

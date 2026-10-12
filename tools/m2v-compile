@@ -42,7 +42,7 @@ REPO = HERE.parent
 sys.path.insert(0, str(REPO / "sweep"))
 import m2v_sweep  # noqa: E402
 
-SCHEMA = 1
+SCHEMA = 2
 LOG = []  # every pipeline command with its rc and full output (failure logs)
 TIMEOUT = 120.0  # per-stage cap, set from --timeout
 
