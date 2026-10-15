@@ -151,7 +151,7 @@ def main():
             rows.append({"arm": arm, "t": t, "ms_median": q2, "ms_q1": q1, "ms_q3": q3, "ms_min": min(v),
                          "row_err_vs_f64": errs[(arm, t)], "samples": len(v)})
         result["shapes"].append({"n": n, "weight_copies": copies, "rows": rows})
-        print(f"\nN={n} K={k} gs={gs} bits={bits} copies={copies}  ms per dispatch (median of {a.rounds - 1} interleaved rounds)")
+        print(f"\nN={n} K={k} gs={gs} bits={bits} copies={copies}  ms per dispatch (median of {a.rounds - 1} interleaved rounds); err = row error vs float64 on {SAMPLE_COLS} sampled columns")
         print("| T | " + " | ".join(f"{arm} ms | {arm} err" for arm in arms) + " |")
         print("|---|" + "---|---|" * len(arms))
         for t in ts:

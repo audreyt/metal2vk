@@ -57,14 +57,17 @@ Also T 1..8, 11 rounds, 16 dispatches per timed batch, group size 64, 4 bits, bf
   Round 0 is warm-up. The table shows the median of the other rounds, in ms per dispatch.
 - Weights rotate through enough copies to pass 256 MiB, so the system cache never holds them.
 - Each cell's output is compared with a float64 CPU reference on 96 sampled columns.
-  Row error is the largest absolute error in a row divided by the largest reference magnitude in that row.
+  Row error is the largest absolute error in a row, over the largest reference magnitude in that row, on those columns.
 - After the table, each arm prints its cost at T = 8 over its cost at its smallest T (T = 2 for `qmvw`, else T = 1).
   Deployed T = 1 is the decode step. A ratio near 1 means flat in T. A ratio near 4 means the cost scales with T.
 - An arm that raises on the device (for example, no matrix support for `qmmt`) is listed as not run and does not stop the others.
 
 Limits: weights and activations are random. The rows show cost and numeric error. They say nothing about model quality.
 Each timed batch includes host encode time. The kernels run for 0.1 ms or more, so the GPU should set the pace.
-The deployed arm uses the route the build and environment pick for each T.
+The deployed arm ("main wheel default route") is `mx.quantized_matmul` on the same wheel and driver, with the default environment.
+A statement about a shipped release needs a separate run of that arm alone on the release wheel.
+The release wheel has no metal2vk route, so it cannot run the translated arms.
+Record the Vulkan driver in use (package version and library hash) next to the result.
 The JSON records the `MLX_OMARCHY_*` variables.
 
 ## Test
