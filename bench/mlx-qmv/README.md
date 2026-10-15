@@ -69,7 +69,7 @@ Each timed batch includes host encode time. The kernels run for 0.1 ms or more, 
 The deployed arm ("main wheel default route") is `mx.quantized_matmul` on the same wheel and driver, with the default environment.
 A statement about a shipped release needs a separate run of that arm alone on the release wheel.
 The release wheel has no metal2vk route, so it cannot run the translated arms.
-`qbench.py` reads `/proc/self/maps` after the first dispatch and hashes every mapped `libvulkan_asahi.so`.
+`qbench.py` reads `/proc/self/maps` after the first dispatch and hashes every mapped Vulkan driver library.
 The paths and the first 16 hex of each hash go to the JSON.
 With `--driver-sha16 HASH` the run exits 4 unless that hash is the only one loaded.
 The JSON records the `MLX_OMARCHY_*` variables.
