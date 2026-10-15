@@ -61,13 +61,17 @@ Also T 1..8, 11 rounds, 16 dispatches per timed batch, group size 64, 4 bits, bf
 - After the table, each arm prints its cost at T = 8 over its cost at its smallest T (T = 2 for `qmvw`, else T = 1).
   Deployed T = 1 is the decode step. A ratio near 1 means flat in T. A ratio near 4 means the cost scales with T.
 - An arm that raises on the device (for example, no matrix support for `qmmt`) is listed as not run and does not stop the others.
+- Once per N and T, the deployed arm runs with `MLX_OMARCHY_TRACE_DISPATCH` set. The JSON holds the kernel ids and grids it dispatched.
+  That shows which route the build chose for each T.
 
 Limits: weights and activations are random. The rows show cost and numeric error. They say nothing about model quality.
 Each timed batch includes host encode time. The kernels run for 0.1 ms or more, so the GPU should set the pace.
 The deployed arm ("main wheel default route") is `mx.quantized_matmul` on the same wheel and driver, with the default environment.
 A statement about a shipped release needs a separate run of that arm alone on the release wheel.
 The release wheel has no metal2vk route, so it cannot run the translated arms.
-Record the Vulkan driver in use (package version and library hash) next to the result.
+`qbench.py` reads `/proc/self/maps` after the first dispatch and hashes every mapped `libvulkan_asahi.so`.
+The paths and the first 16 hex of each hash go to the JSON.
+With `--driver-sha16 HASH` the run exits 4 unless that hash is the only one loaded.
 The JSON records the `MLX_OMARCHY_*` variables.
 
 ## Test

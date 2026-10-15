@@ -13,12 +13,15 @@ DIR is the qmv_corpus.py build output (header.metal, aot/). Run under the GPU qu
 Route check (not done here, mlx prints it at exit): stderr must end with 'translator=0 fallbacks=0 refusals=0'.
 """
 import argparse
+import hashlib
 import json
 import os
 import pathlib
 import random
+import re
 import statistics
 import sys
+import tempfile
 import time
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -39,8 +42,38 @@ def parse():
     ap.add_argument("--batch", type=int, default=16, help="dispatches per timed eval")
     ap.add_argument("--arms", default="dep,qmvf,qmvw,qmmt")
     ap.add_argument("--out", default="")
+    ap.add_argument("--driver-sha16", default="", help="exit 4 unless every loaded libvulkan_asahi.so hashes to this")
     ap.add_argument("--selftest", action="store_true", help="CPU, no translated arms: checks the harness plumbing")
     return ap.parse_args()
+
+
+def loaded_driver_libs():
+    """{path: first 16 hex of sha256} for every libvulkan_asahi.so mapped into this process."""
+    paths = set()
+    with open("/proc/self/maps") as maps:
+        for line in maps:
+            parts = line.split(maxsplit=5)
+            if len(parts) == 6 and "libvulkan_asahi.so" in parts[5]:
+                paths.add(parts[5].strip().removesuffix(" (deleted)"))
+    return {p: hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()[:16] for p in sorted(paths)}
+
+
+def traced(run):
+    """Run `run()` with MLX_OMARCHY_TRACE_DISPATCH set and stderr sent to a file; return the DISPATCH records."""
+    with tempfile.TemporaryFile("w+") as tmp:
+        saved = os.dup(2)
+        os.dup2(tmp.fileno(), 2)
+        os.environ["MLX_OMARCHY_TRACE_DISPATCH"] = "1"
+        try:
+            run()
+        finally:
+            os.environ.pop("MLX_OMARCHY_TRACE_DISPATCH", None)
+            os.dup2(saved, 2)
+            os.close(saved)
+        tmp.seek(0)
+        text = tmp.read()
+    return [{"kernel": int(m[1]), "gx": int(m[2]), "gy": int(m[3]), "gz": int(m[4])}
+            for m in re.finditer(r"DISPATCH kernel=(-?\d+) count=\d+ gx=(\d+) gy=(\d+) gz=(\d+)", text)]
 
 
 def main():
@@ -116,6 +149,22 @@ def main():
         b64 = np.repeat(np.array(mx.take(bi[0], idx, axis=0).astype(mx.float32)), gs, axis=1).astype(np.float64)
         wref = q * s64 + b64
 
+        if not a.selftest:
+            trace = {}
+            for t in ts:
+                trace[t] = traced(lambda t=t: mx.eval(call("dep", t, n, w[0], sc[0], bi[0], xs[t])))
+                print(f"N={n} T={t} dep dispatches: " + ", ".join(
+                    f"kernel {d['kernel']} grid {d['gx']}x{d['gy']}x{d['gz']}" for d in trace[t]))
+            result.setdefault("dep_trace", {})[str(n)] = {str(t): v for t, v in trace.items()}
+            if "driver_libs" not in result:
+                result["driver_libs"] = loaded_driver_libs()
+                print("driver libraries mapped:", result["driver_libs"])
+                if a.driver_sha16 and set(result["driver_libs"].values()) != {a.driver_sha16}:
+                    print(f"DRIVER MISMATCH: wanted exactly {{{a.driver_sha16}}}")
+                    if a.out:
+                        pathlib.Path(a.out).write_text(json.dumps(result, indent=1) + "\n")
+                    sys.exit(4)
+
         errs = {}
         for arm, t in cells():
             if arm in dead:
@@ -171,4 +220,5 @@ def main():
         pathlib.Path(a.out).write_text(json.dumps(result, indent=1) + "\n")
 
 
-main()
+if __name__ == "__main__":
+    main()
