@@ -17,8 +17,8 @@ class MappingTest(unittest.TestCase):
 
     def test_every_mapped_variant_exists(self):
         ids = {v["id"] for v in corpus.variants()}
-        for kind in ("qmvf", "qmvw", "qmmt"):
-            for t in range(1, 9):
+        for kind in ("qmvf", "qmvw", "qmmt", "qmmt16"):
+            for t in range(1, 33):
                 if kind == "qmvw" and t < 2:
                     continue
                 self.assertIn(corpus.variant_for(kind, t), ids)
@@ -33,6 +33,28 @@ class MappingTest(unittest.TestCase):
         self.assertEqual((gx // tx, gy // 2 * 8), (5, 17408))
         (gx, gy, _), (tx, _, _) = corpus.grid("qmmt", 32, 8, 248320)
         self.assertEqual((gx // tx * 32, gy), (248320, 1))
+
+    def test_row_tiles_cover_the_17_to_32_case(self):
+        by_id = {x["id"]: x for x in corpus.variants()}
+        for t in range(1, 33):
+            for kind, rows in (("qmmt", 32), ("qmmt16", 16)):
+                v = by_id[corpus.variant_for(kind, t)]
+                (gx, gy, _), (tx, ty, _) = corpus.grid(kind, v["nv"], t, 10240)
+                self.assertEqual(v["nv"], rows)
+                self.assertEqual((gx // tx) * 32, 10240)
+                self.assertGreaterEqual((gy // ty) * rows, t)
+                self.assertLess((gy // ty - 1) * rows, t)  # no empty tile row
+        self.assertEqual(corpus.grid("qmmt16", 16, 17, 10240)[0][1], 2)
+        self.assertEqual(corpus.grid("qmmt", 32, 17, 10240)[0][1], 1)
+
+    def test_wide_tiling_up_to_32_rows(self):
+        by_id = {x["id"]: x for x in corpus.variants()}
+        for t in range(2, 33):
+            tiles = -(-t // 5)
+            v = by_id[corpus.variant_for("qmvw", t)]
+            self.assertLessEqual(v["nv"], 5)
+            self.assertGreaterEqual(tiles * v["nv"], t)
+            self.assertEqual(corpus.grid("qmvw", v["nv"], t, 10240)[0][0] // 32, tiles)
 
 
 class FlattenTest(unittest.TestCase):

@@ -3,7 +3,8 @@
 
 One process, one device, interleaved: every round runs one timed batch of each (T, arm) cell in a shuffled order
 (reversed on odd rounds); round 0 is warm-up. Arms: dep (mx.quantized_matmul, whatever route the build picks),
-qmvf (affine_qmv_fast), qmvw (affine_qmv_wide, MLX's tile rule for NV), qmmt (affine_qmm_t). Each cell's output
+qmvf (affine_qmv_fast), qmvw (affine_qmv_wide, MLX's tile rule for NV), qmmt (affine_qmm_t, 32 row tile),
+qmmt16 (the same with a 16 row tile). Each cell's output
 is checked against a float64 CPU reference on sampled output columns (row error = max abs error of the row over its
 largest reference magnitude).
 
@@ -88,7 +89,7 @@ def main():
     if not a.selftest:
         os.environ.setdefault("MLX_OMARCHY_M2V_AOT_DIR", str(build / "aot"))
         os.environ.setdefault("MLX_OMARCHY_M2V_SUMMARY", "1")
-        for base in ("QMV_WIDE", "QMV_FAST", "QMM_T"):
+        for base in ("QMV_WIDE", "QMV_FAST", "QMM_T", "QMM_T16"):
             os.environ.setdefault(f"MLX_OMARCHY_M2V_KERNEL_{base}", "m2v")
     import mlx.core as mx
     import numpy as np

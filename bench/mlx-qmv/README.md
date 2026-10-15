@@ -18,7 +18,10 @@ The metal2vk route in omarchy-mlx then compiles and dispatches the kernel.
 | `qmvf` | `affine_qmv_fast` | T x N/8 threadgroups of 64 | one threadgroup per row, weights read T times |
 | `qmvw2` to `qmvw5` | `affine_qmv_wide` (NV = 2..5) | ceil(T/NV) x N/8 | one weight decode feeds NV rows |
 | `qmmt` | `affine_qmm_t` | N/32 x ceil(T/32), 128 threads | 32 x 32 tile through simdgroup matrices |
+| `qmmt16` | `affine_qmm_t` with BM 16 | N/32 x ceil(T/16), 128 threads | 16 x 32 tile, so a 16 row step needs one tile row |
 
+`qmmt16` is the same kernel with a 16 row tile. A step at 16 or 17 rows against 32 or 33 rows shows which tile fits.
+`qmmt` covers up to 32 rows in one tile row. `qmmt16` covers 16, so 17 to 32 rows take two tile rows.
 T = 6, 7, 8 take two `qmvw` tiles (3, 4, 4 rows), the rule in `qmv_wide` in MLX's `quantized.cpp`.
 MLX Metal uses `qmv_wide` for affine only on gen 15 and later. Here it is a candidate that Metal on older chips does not ship.
 
@@ -47,9 +50,10 @@ grep -q 'translator=0 fallbacks=0 refusals=0' route.err    # else the translated
 ```
 
 `qbench.py` sets `MLX_OMARCHY_M2V_AOT_DIR` to `D/aot`.
-It routes `qmv_wide`, `qmv_fast` and `qmm_t` to metal2vk.
+It routes `qmv_wide`, `qmv_fast`, `qmm_t` and `qmm_t16` to metal2vk.
 Defaults: K 5120 and N 10240, 12288, 17408, 248320 (the 27B layer shapes and the head).
 Also T 1..8, 11 rounds, 16 dispatches per timed batch, group size 64, 4 bits, bf16.
+Pass `--ts` and `--arms` for other curves: `--ts 1,2,4,8,16,17,24,32 --arms dep,qmvw,qmmt,qmmt16` shows where a step sits.
 
 ## What the run measures
 

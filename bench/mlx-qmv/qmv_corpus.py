@@ -4,7 +4,7 @@
 The kernel bodies call the pinned MLX impl functions (quantized.h at the MLX pin in omarchy-mlx's mlx.lock):
   qmvw   affine_qmv_wide  one weight decode reused across NV vectors (NV 2..5; T 6..8 take two tiles)
   qmvf   affine_qmv_fast  one threadgroup per vector (the plain qmv MLX Metal uses below its batch limit)
-  qmmt   affine_qmm_t     32x32x32 steel tile (the Metal matrix route)
+  qmmt   affine_qmm_t     32x32x32 steel tile (the Metal matrix route); qmmt16 the same with a 16 row tile
 The harness (qbench.py, on the Mac) and this builder (on the CT) take source, header, template and grid from here, so the
 MSL text mlx assembles at dispatch is the text this file compiles, and the AOT key sha256(msl NUL entry) matches.
 
@@ -34,11 +34,15 @@ SRC_QMVF = """
   qmv_fast_impl<T, GS, BITS>(w, scales, biases, x, y, K, N,
       threadgroup_position_in_grid, simdgroup_index_in_threadgroup, thread_index_in_simdgroup);
 """
-SRC_QMMT = """
+
+
+def qmmt_source(bm):
+    """affine_qmm_t body with a BM x 32 x 32 tile (MLX's default is 32; 16 halves the rows a threadgroup spans)."""
+    return f"""
   constexpr int BK_padded = (32 + 16 / sizeof(T));
-  threadgroup T Xs[32 * BK_padded];
+  threadgroup T Xs[{bm} * BK_padded];
   threadgroup T Ws[32 * BK_padded];
-  qmm_t_impl<T, GS, BITS, true, 32, 32, 32>(w, scales, biases, x, y, Xs, Ws, K, N, M, K,
+  qmm_t_impl<T, GS, BITS, true, {bm}, 32, 32>(w, scales, biases, x, y, Xs, Ws, K, N, M, K,
       threadgroup_position_in_grid, thread_index_in_threadgroup, simdgroup_index_in_threadgroup,
       thread_index_in_simdgroup);
 """
@@ -51,8 +55,10 @@ def variants():
     for nv in (2, 3, 4, 5):
         out.append({"id": f"qmvw{nv}", "name": "qmv_wide", "source": SRC_QMVW, "kind": "qmvw", "nv": nv,
                     "tmpl": [("T", "bfloat16"), ("GS", GS), ("BITS", BITS), ("NV", nv), ("KL", 8)]})
-    out.append({"id": "qmmt", "name": "qmm_t", "source": SRC_QMMT, "kind": "qmmt", "nv": 32,
-                "tmpl": [("T", "bfloat16"), ("GS", GS), ("BITS", BITS)]})
+    for bm in (32, 16):
+        out.append({"id": "qmmt" if bm == 32 else f"qmmt{bm}", "name": "qmm_t" if bm == 32 else f"qmm_t{bm}",
+                    "source": qmmt_source(bm), "kind": "qmmt" if bm == 32 else f"qmmt{bm}", "nv": bm,
+                    "tmpl": [("T", "bfloat16"), ("GS", GS), ("BITS", BITS)]})
     return out
 
 
@@ -71,7 +77,7 @@ def grid(kind, nv, t, n):
         return (tiles * 32, ((n + 7) // 8) * 2, 1), (32, 2, 1)
     if kind == "qmvf":
         return (t * 32, ((n + 7) // 8) * 2, 1), (32, 2, 1)
-    return (((n + 31) // 32) * 128, ((t + 31) // 32), 1), (128, 1, 1)  # qmmt: 128 threads, grid y in tiles
+    return (((n + 31) // 32) * 128, (t + nv - 1) // nv, 1), (128, 1, 1)  # qmmt, qmmt16: 128 threads, nv rows per tile
 
 
 def flatten(root):
