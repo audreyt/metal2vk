@@ -55,7 +55,13 @@ def loaded_driver_libs():
             parts = line.split(maxsplit=5)
             if len(parts) == 6 and "libvulkan_asahi.so" in parts[5]:
                 paths.add(parts[5].strip().removesuffix(" (deleted)"))
-    return {p: hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()[:16] for p in sorted(paths)}
+    libs = {}
+    for p in sorted(paths):
+        try:
+            libs[p] = hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()[:16]
+        except OSError:
+            libs[p] = "unreadable"  # an unlinked library still mapped: the set check then fails closed
+    return libs
 
 
 def traced(run):
@@ -92,6 +98,8 @@ def main():
     gs, bits = corpus.GS, corpus.BITS
     k = a.k
     ns = [int(v) for v in a.ns.split(",")]
+    if any(n % 32 for n in ns):
+        sys.exit("every N must be a multiple of 32: qmv_fast reads 8 output rows and qmm_t 32 per threadgroup")
     ts = [int(v) for v in a.ts.split(",")]
     arms = [v for v in a.arms.split(",") if v]
     if a.selftest:

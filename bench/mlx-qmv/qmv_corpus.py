@@ -141,6 +141,8 @@ def build(root, outdir):
         manifest.append(row)
         print(row["id"], row["compile"], row.get("error", "ok"))
     (out / "manifest.json").write_text(json.dumps(manifest, indent=1) + "\n")
+    if any(row["compile"] for row in manifest):
+        sys.exit("build failed: at least one variant did not compile")
 
 
 if __name__ == "__main__":
