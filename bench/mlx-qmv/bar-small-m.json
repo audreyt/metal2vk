@@ -1,0 +1,1 @@
+{"m": [2, 4, 8, 16], "n": [10240, 12288, 17408], "arms": ["qmvf", "qmvw"], "min_gain": 0.10, "max_row_err": 0.01, "driver_sha16": "40282811c6e14ef9", "baseline_drift": 0.15}

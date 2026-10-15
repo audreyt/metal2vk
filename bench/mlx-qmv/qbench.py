@@ -40,7 +40,7 @@ def parse():
     ap.add_argument("--ts", default="1,2,3,4,5,6,7,8")
     ap.add_argument("--rounds", type=int, default=11)
     ap.add_argument("--batch", type=int, default=16, help="dispatches per timed eval")
-    ap.add_argument("--arms", default="dep,qmvf,qmvw,qmmt")
+    ap.add_argument("--arms", default="dep,qmvf,qmvw", help="add qmmt only on a build whose m2v route enables cooperative matrix")
     ap.add_argument("--out", default="")
     ap.add_argument("--driver-sha16", default="", help="exit 4 unless every loaded libvulkan_asahi.so hashes to this")
     ap.add_argument("--selftest", action="store_true", help="CPU, no translated arms: checks the harness plumbing")
