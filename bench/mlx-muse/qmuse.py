@@ -349,6 +349,7 @@ def main():
                   flush=True)
     result = {"route": args.route, "device": str(mx.default_device()), "reps": args.reps, "batch": args.batch,
               "mlx": getattr(mx, "__version__", ""), "platform": sys.platform,
+              "requested": {f"{r['id']}@T{r['t']}": r["status"] for r in rows},
               "env": {e: os.environ[e] for e in sorted(os.environ) if e.startswith("MLX_OMARCHY")}, "rows": rows}
     if args.out:
         pathlib.Path(args.out).write_text(json.dumps(result, indent=1) + "\n")

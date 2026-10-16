@@ -11,9 +11,12 @@ import numpy as np
 HERE = pathlib.Path(__file__).resolve().parent
 
 
-def dump(path, out, ref, inputs=("aa",), platform="linux", case="c@T1", tol=None):
-    meta = {"platform": platform, "device": "d", "mlx": "x", "route": "r"}
-    arrays = {f"{case}:out0": out, f"{case}:ref0": ref, f"{case}:inputs": np.array(json.dumps(list(inputs)))}
+def dump(path, out, ref, inputs=("aa",), platform="linux", case="c@T1", tol=None, requested=None, drop_ref=False):
+    meta = {"platform": platform, "device": "d", "mlx": "x", "route": "r",
+            "requested": {case: "ok"} if requested is None else requested}
+    arrays = {f"{case}:out0": out, f"{case}:inputs": np.array(json.dumps(list(inputs)))}
+    if not drop_ref:
+        arrays[f"{case}:ref0"] = ref
     if tol is not None:
         arrays[f"{case}:tol0"] = np.array(tol)
     np.savez(path, meta=np.array(json.dumps(meta)), **arrays)
@@ -87,6 +90,21 @@ class CompareTest(unittest.TestCase):
         side = {"ref": idx}
         self.assertEqual(compare({"out": idx, "tol": 0.0, **side}, {"out": wrong, "tol": 0.0, **side})[0], 1)
         self.assertEqual(compare({"out": idx, **side}, {"out": wrong, **side})[0], 0)  # 2e-2 alone hides it
+
+    def test_a_case_that_failed_on_both_platforms_is_not_a_pass(self):
+        failed = {"c@T1": "ok", "gone@T1": "ERROR"}
+        code, out = compare(self.side(requested=failed), self.side(requested=failed))
+        self.assertEqual(code, 2)
+        self.assertIn("gone@T1", out)
+        self.assertIn("ERROR", out)
+
+    def test_a_dump_without_a_request_list_is_not_comparable(self):
+        self.assertEqual(compare(self.side(requested={}), self.side())[0], 2)
+
+    def test_a_requested_case_missing_its_reference_is_incomplete(self):
+        code, out = compare(self.side(drop_ref=True), self.side())
+        self.assertEqual(code, 2)
+        self.assertIn("c@T1", out)
 
 
 if __name__ == "__main__":

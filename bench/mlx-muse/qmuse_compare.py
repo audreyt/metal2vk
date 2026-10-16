@@ -38,6 +38,12 @@ def outputs(dump, case):
     return n
 
 
+def complete(dump, case):
+    """The case has an input list and at least one output, each with its reference."""
+    n = outputs(dump, case)
+    return f"{case}:inputs" in dump.files and n > 0 and all(f"{case}:ref{i}" in dump.files for i in range(n))
+
+
 def flag(err, tol):
     return f"{err:.2e}{'' if err <= tol else ' FAIL'}"
 
@@ -48,7 +54,15 @@ def compare(a, b, tol):
     ma, mb = json.loads(str(a["meta"])), json.loads(str(b["meta"]))
     lines.append(f"A: {ma['platform']} {ma['device']} mlx {ma['mlx']} route {ma['route']}")
     lines.append(f"B: {mb['platform']} {mb['device']} mlx {mb['mlx']} route {mb['route']}")
+    for name, meta in (("A", ma), ("B", mb)):
+        if not meta.get("requested"):
+            return lines + [f"NOT COMPARABLE: dump {name} does not list the cases that were requested"], 2
     ca, cb = cases(a), cases(b)
+    missing = [f"{key} ({side}: {meta['requested'].get(key, 'not requested')})"
+               for key in sorted(set(ma["requested"]) | set(mb["requested"]))
+               for side, meta, dump in (("A", ma, a), ("B", mb, b)) if not complete(dump, key)]
+    if missing:
+        return lines + ["NOT COMPARABLE: requested cases without complete outputs: " + "; ".join(missing)], 2
     if not ca or ca != cb:
         return lines + [f"NOT COMPARABLE: case sets differ or are empty ({ca} vs {cb})"], 2
     lines.append("| case | out | A vs B row err | identical | max abs diff | A vs refA | B vs refB | refA vs refB |")

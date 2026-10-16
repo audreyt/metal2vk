@@ -65,9 +65,10 @@ def jobs(src):
     def capture(name):
         common = (src / "mlxlm/_common.py").read_text()
         body = IMPORT_COMMON.sub("", (src / f"mlxlm/{name}.py").read_text())
-        with tempfile.NamedTemporaryFile("w", suffix=f"_{name}.py", delete=False) as f:
+        with tempfile.NamedTemporaryFile("w", suffix=f"_{name}.py") as f:
             f.write(common + "\n" + body)
-        return asm.capture_module(f.name)[1]
+            f.flush()
+            return asm.capture_module(f.name)[1]
 
     def reg_named(recorder, name):
         hits = [c for c in recorder.calls if c["name"] == name]
@@ -160,8 +161,12 @@ def build(src, outdir):
                             "--name", j["entry"], "--json"], capture_output=True, text=True, check=False)
         row = {"id": j["id"], "kernel": j["kernel"], "origin": j["origin"], "entry": j["entry"], "key": key,
                "compile": r.returncode}
-        if r.returncode == 0:
-            res = json.loads(r.stdout.strip().splitlines()[-1])
+        lines = r.stdout.strip().splitlines()
+        if r.returncode == 0 and not lines:
+            row["compile"] = 1
+            row["error"] = "m2v-compile exited 0 with no JSON on stdout"
+        elif r.returncode == 0:
+            res = json.loads(lines[-1])
             for ext in ("spv", "json"):
                 (out / "aot" / f"{key}.{ext}").write_bytes(pathlib.Path(res[ext]).read_bytes())
             refl = json.loads((out / "aot" / f"{key}.json").read_text())
