@@ -59,8 +59,12 @@ python3 bench/mlx-muse/qmuse_compare.py macos.npz linux.npz
 
 For each case and output, the table shows three numbers. They are the largest row error between the platforms, the fraction of bit-identical elements and the largest absolute difference.
 It also shows each side against its own CPU reference. It shows the two references against each other too.
-The exit code is 0 when every case is within `--tol` (default 2e-2). It is 1 when one is not. It is 2 when the dumps are not comparable.
-Dumps are not comparable when the case sets differ or the input hashes differ.
+A case agrees when three errors are within `--tol` (default 2e-2): platform A against B, A against its reference, and B against its reference.
+An output that the runner checks tighter, such as an index output, is compared as tight.
+The exit code is 0 when every case agrees. It is 1 when one does not. It is 2 when the dumps are not comparable.
+Dumps are not comparable when the case sets, the input hashes or the shapes differ.
+They are also not comparable when the two CPU references differ by more than the tolerance.
+`qmuse.py` itself exits 1 when any case is a mismatch or an error, or when no case ran.
 
 ## Limits
 

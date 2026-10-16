@@ -68,5 +68,42 @@ class ReferenceTest(unittest.TestCase):
         self.assertLess(float(mx.abs(w.sum(-1) - 2.5).max()), 1e-4)
 
 
+@unittest.skipIf(mx is None, "mlx is not installed")
+class ExitCodeTest(unittest.TestCase):
+    """qmuse.main returns 0 only when every case is ok: a MISMATCH or an ERROR row must not exit 0."""
+
+    def run_main(self, builder, extra=()):
+        import tempfile
+        from unittest import mock
+
+        import qmuse
+        mx.set_default_device(mx.cpu)
+        with tempfile.TemporaryDirectory() as tmp:
+            src = pathlib.Path(tmp)
+            (src / "mlxlm").mkdir()
+            (src / "mlxlm" / "__init__.py").write_text("")
+            (src / "omlx_norm_kernels.py").write_text("")
+            argv = ["qmuse.py", "--src", str(src), "--route", "native", "--reps", "1", "--batch", "1", "--tokens", "1",
+                    *extra]
+            with mock.patch.object(sys, "argv", argv), mock.patch.object(qmuse, "make_cases", lambda *_: {"c": builder}):
+                return qmuse.main()
+
+    def test_ok_returns_0(self):
+        one = mx.ones((2, 4))
+        self.assertEqual(self.run_main(lambda _: (lambda: [one], lambda: [(one, 1e-4)], [one])), 0)
+
+    def test_mismatch_returns_1(self):
+        one = mx.ones((2, 4))
+        self.assertEqual(self.run_main(lambda _: (lambda: [mx.zeros((2, 4))], lambda: [(one, 1e-4)], [one])), 1)
+
+    def test_error_returns_1(self):
+        def builder(_):
+            raise RuntimeError("a kernel this device cannot run")
+        self.assertEqual(self.run_main(builder), 1)
+
+    def test_no_case_ran_returns_1(self):
+        self.assertEqual(self.run_main(lambda _: None, extra=("--cases", "no_such_case")), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

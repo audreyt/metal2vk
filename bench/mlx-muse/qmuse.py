@@ -10,8 +10,11 @@ wrapper at T = 1 (decode) and T = 16 (verify) tokens with the dimensions muse_co
 --route m2v sends the 12 kernels through omarchy-mlx's metal2vk route from the AOT directory built by muse_corpus.py;
 --route translator leaves the default route. Run both in separate processes to compare the two.
 
-usage: qmuse.py --src SRC [--aot DIR] [--route m2v|translator] [--reps 9] [--batch 16] [--out FILE.json] [--selftest]
-With --route m2v mlx prints a route summary at exit: stderr must contain 'translator=0 fallbacks=0 refusals=0'.
+usage: qmuse.py --src SRC [--route m2v|translator|native] [--aot DIR] [--cases a,b] [--tokens 1,16] [--dump FILE.npz]
+                [--reps 9] [--batch 16] [--out FILE.json] [--selftest]
+Exit 0 when every case is ok, 1 when any case is MISMATCH or ERROR or no case ran.
+--route native is macOS MLX (nothing is routed). With --route m2v mlx prints a route summary at exit: stderr must hold
+'route summary: m2v=N translator=0 fallbacks=0 refusals=0' (the total line).
 --selftest runs on the CPU with each reference standing in for its kernel (checks the plumbing only).
 """
 import argparse
@@ -319,9 +322,10 @@ def main():
                     key = f"{cid}@T{t}"
                     row["inputs_sha16"] = [hashlib.sha256(np.array(a.astype(mx.float32)).tobytes()).hexdigest()[:16]
                                            for a in ins]
-                    for i, (g, (w, _)) in enumerate(zip(got, want)):
+                    for i, (g, (w, tol)) in enumerate(zip(got, want)):
                         dump[f"{key}:out{i}"] = np.array(g.astype(mx.float32))
                         dump[f"{key}:ref{i}"] = np.array(w)
+                        dump[f"{key}:tol{i}"] = np.array(tol)
                     dump[f"{key}:inputs"] = np.array(json.dumps(row["inputs_sha16"]))
                 errs = [row_error(g.astype(mx.float32), w) for g, (w, _) in zip(got, want)]
                 row["err"] = errs
@@ -354,7 +358,8 @@ def main():
     bad = [r for r in rows if r["status"] != "ok"]
     print(f"{len(rows) - len(bad)} of {len(rows)} cases ok" + ("" if not bad else "; not ok: " + ", ".join(
         f"{r['id']}@T{r['t']}={r['status']}" for r in bad)))
+    return 1 if bad or not rows else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
