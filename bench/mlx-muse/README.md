@@ -29,6 +29,7 @@ All 21 representative instantiations compile. All 21 pass `spirv-val --target-en
 `qmuse.py` runs the pinned wrapper code unmodified. It checks every output against a float32 reference from the CPU stream.
 It can also write a dump for the comparer.
 Inputs come from numpy and are seeded from the case name. Every platform draws the same bytes.
+Set `PYTHONDONTWRITEBYTECODE=1` when `SRC` is a hashed package directory. Python then writes no `__pycache__` into it.
 
 macOS MLX, native Metal. It needs `mlx`, `numpy` and `SRC`:
 
