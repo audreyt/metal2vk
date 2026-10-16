@@ -47,7 +47,7 @@ grep -q 'translator=0 fallbacks=0 refusals=0' route.err    # else the translated
 ```
 
 `qbench.py` sets `MLX_OMARCHY_M2V_AOT_DIR` to `D/aot`.
-It routes `qmv_wide`, `qmv_fast` and `qmm_t` to metal2vk.
+It routes `qmv_wide` and `qmv_fast` to metal2vk, and `qmm_t` when the arm `qmmt` is requested.
 Defaults: K 5120 and N 10240, 12288, 17408, 248320 (the 27B layer shapes and the head).
 Also T 1..8, 11 rounds, 16 dispatches per timed batch, group size 64, 4 bits, bf16.
 
@@ -74,8 +74,36 @@ The paths and the first 16 hex of each hash go to the JSON.
 With `--driver-sha16 HASH` the run exits 4 unless that hash is the only one loaded.
 The JSON records the `MLX_OMARCHY_*` variables.
 
+## Read the result against a bar
+
+```sh
+python3 bench/mlx-qmv/qread.py result.json --bar bench/mlx-qmv/bar-small-m.json --route route.err --baseline SEALED.json
+```
+
+`qread.py` prints the median ms of the deployed arm and each translated arm at the bar's M values and N values, and one verdict per arm.
+The bar file is written and hashed before the run. The reader prints its sha256.
+An arm passes a cell when it is at least `min_gain` faster than the deployed arm, its q3 is below the deployed arm's q1, and its row error is within `max_row_err`.
+An arm passes the bar when it passes every cell. A cell that was not measured fails.
+The exit code is 0 for pass, 1 for fail and 2 when the result is not valid evidence.
+A result is not valid when the loaded driver set is wrong or a bar cell has no deployed dispatch trace.
+It is also not valid when the route total line is not `translator=0 fallbacks=0 refusals=0`, or a deployed median is not positive.
+A deployed median more than `baseline_drift` from the sealed run, or a sealed run that shares no deployed cell with the bar, makes it not valid.
+So does a malformed bar (a missing key, a wrong type, or an empty `m`, `n` or `arms` list) or an unreadable input.
+
+## The 17 to 32 row case
+
+The 32 row tile is `qmmt`. The m2v route refuses it on the current backend, because the module uses cooperative matrix.
+Until the route enables cooperative matrix, test the 17 to 32 row range with the arms that run:
+
+```sh
+qbench.py --build . --ns 10240,12288,17408 --ts 1,2,4,8,16,17,24,32 --arms dep,qmvf,qmvw --out result-curve.json
+```
+
+Rows at T = 16 and T = 17 show a step in the deployed route.
+`qmvw` tiles ceil(T/5) times, so it has no step at 16 or 17 by itself.
+
 ## Test
 
 ```sh
-python3 -m unittest bench/mlx-qmv/test_qmv_corpus.py
+python3 -m unittest bench/mlx-qmv/test_qmv_corpus.py bench/mlx-qmv/test_qread.py
 ```
