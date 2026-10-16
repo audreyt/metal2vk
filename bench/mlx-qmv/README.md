@@ -85,7 +85,10 @@ The bar file is written and hashed before the run. The reader prints its sha256.
 An arm passes a cell when it is at least `min_gain` faster than the deployed arm, its q3 is below the deployed arm's q1, and its row error is within `max_row_err`.
 An arm passes the bar when it passes every cell. A cell that was not measured fails.
 The exit code is 0 for pass, 1 for fail and 2 when the result is not valid evidence.
-A result is not valid when the loaded driver set is wrong, the dep trace is missing, the route total line is not `translator=0 fallbacks=0 refusals=0`, or a deployed median is more than `baseline_drift` from the sealed run.
+A result is not valid when the loaded driver set is wrong or a bar cell has no deployed dispatch trace.
+It is also not valid when the route total line is not `translator=0 fallbacks=0 refusals=0`, or a deployed median is not positive.
+A deployed median more than `baseline_drift` from the sealed run, or a sealed run that shares no deployed cell with the bar, makes it not valid.
+So does a malformed bar (a missing key, a wrong type, or an empty `m`, `n` or `arms` list) or an unreadable input.
 
 ## The 17 to 32 row case
 

@@ -88,8 +88,10 @@ def main():
     if not a.selftest:
         os.environ.setdefault("MLX_OMARCHY_M2V_AOT_DIR", str(build / "aot"))
         os.environ.setdefault("MLX_OMARCHY_M2V_SUMMARY", "1")
-        for base in ("QMV_WIDE", "QMV_FAST", "QMM_T"):
-            os.environ.setdefault(f"MLX_OMARCHY_M2V_KERNEL_{base}", "m2v")
+        routed = {"qmvf": "QMV_FAST", "qmvw": "QMV_WIDE", "qmmt": "QMM_T"}
+        for arm in a.arms.split(","):
+            if arm in routed:
+                os.environ.setdefault(f"MLX_OMARCHY_M2V_KERNEL_{routed[arm]}", "m2v")
     import mlx.core as mx
     import numpy as np
 

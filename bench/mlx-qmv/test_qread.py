@@ -19,8 +19,9 @@ def row(arm, t, ms, err=0.002):
 
 def result(qmvf_ms=(0.3, 0.3)):
     rows = [row("dep", 2, 0.5), row("dep", 4, 0.5), row("qmvf", 2, qmvf_ms[0]), row("qmvf", 4, qmvf_ms[1])]
-    return {"k": 5120, "device": "gpu", "mlx": "x", "dep_trace": {"10240": {"2": []}}, "dead": {},
-            "driver_libs": {"/usr/lib/a.so": "aaaa"}, "shapes": [{"n": 10240, "rows": rows}]}
+    return {"k": 5120, "device": "gpu", "mlx": "x", "dead": {}, "driver_libs": {"/usr/lib/a.so": "aaaa"},
+            "dep_trace": {"10240": {"2": [{"kernel": 9}], "4": [{"kernel": 9}]}},
+            "shapes": [{"n": 10240, "rows": rows}]}
 
 
 def run(res, bar=BAR, route=CLEAN, baseline=None):
@@ -81,6 +82,46 @@ class ReaderTest(unittest.TestCase):
                 r["ms_median"] *= 1.3
         self.assertEqual(run(res, baseline=sealed)[0], 2)
         self.assertEqual(run(result(), baseline=sealed)[0], 0)
+
+    def test_empty_bar_lists_are_not_evidence(self):
+        for key in ("m", "n", "arms"):
+            bar = dict(BAR, **{key: []})
+            code, out = run(result(), bar=bar)
+            self.assertEqual(code, 2, key)
+            self.assertNotIn("BAR: PASS", out)
+
+    def test_malformed_bar_exits_2_not_a_traceback_fail(self):
+        bar = {k: v for k, v in BAR.items() if k != "min_gain"}
+        code, out = run(result(), bar=bar)
+        self.assertEqual(code, 2)
+        self.assertIn("missing key min_gain", out)
+        self.assertEqual(run(result(), bar=dict(BAR, min_gain=1.5))[0], 2)
+        self.assertEqual(run(result(), bar=dict(BAR, m="2"))[0], 2)
+
+    def test_malformed_result_exits_2(self):
+        self.assertEqual(run({"k": 5120})[0], 2)
+
+    def test_baseline_with_no_common_dep_cell_is_not_evidence(self):
+        sealed = result()
+        sealed["shapes"][0]["n"] = 99999
+        code, out = run(result(), baseline=sealed)
+        self.assertEqual(code, 2)
+        self.assertIn("no dep cell in common", out)
+
+    def test_every_bar_cell_needs_its_own_dep_trace(self):
+        res = result()
+        del res["dep_trace"]["10240"]["4"]
+        code, out = run(res)
+        self.assertEqual(code, 2)
+        self.assertIn("no dep dispatch trace for N=10240 M=4", out)
+        res = result()
+        res["dep_trace"]["10240"]["2"] = []
+        self.assertEqual(run(res)[0], 2)
+
+    def test_zero_dep_median_is_not_evidence(self):
+        res = result()
+        res["shapes"][0]["rows"][0]["ms_median"] = 0.0
+        self.assertEqual(run(res)[0], 2)
 
 
 if __name__ == "__main__":
